@@ -198,7 +198,7 @@ fun SlateR2App(viewModel: SlateViewModel) {
                 onCheckUpdates = {
                     scope.launch {
                         val message = runCatching { SlateUpdater.checkForUpdate(context) }.fold(
-                            onSuccess = { if (it == null) "Slate R2 is up to date." else "${it.name} is available from GitHub." },
+                            onSuccess = { if (it == null) "Slate R2 is up to date." else "${it.versionName} is available from GitHub." },
                             onFailure = { it.message ?: "Unable to check for updates." },
                         )
                         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
