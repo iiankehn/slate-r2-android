@@ -32,7 +32,17 @@ class DocumentFormatsTest {
                 page = PageSetup(PageSize.A4, PageOrientation.Landscape, PageMargins(36f, 40f, 44f, 48f), columns = 2),
                 blocks = listOf(
                     ParagraphBlock("heading", listOf(TextRun("Report", CharacterStyle(bold = true, italic = true, fontSizePoints = 18f))), ParagraphStyle(namedStyle = NamedParagraphStyle.Heading1, alignment = ParagraphAlignment.Center, pageBreakBefore = true)),
-                    TableBlock("table", listOf(TableRow(listOf(TableCell(listOf(ParagraphBlock("cell", listOf(TextRun("Value")))))), TableCell())))),
+                    TableBlock(
+                        "table",
+                        listOf(
+                            TableRow(
+                                listOf(
+                                    TableCell(listOf(ParagraphBlock("cell", listOf(TextRun("Value"))))),
+                                    TableCell(),
+                                ),
+                            ),
+                        ),
+                    ),
                 ),
             )),
         )
