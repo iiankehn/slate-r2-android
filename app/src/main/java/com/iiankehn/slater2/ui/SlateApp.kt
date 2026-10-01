@@ -1,12 +1,15 @@
 package com.iiankehn.slater2.ui
 
 import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -24,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -50,6 +54,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -59,6 +64,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -96,6 +103,7 @@ import com.iiankehn.slater2.model.PageOrientation
 import com.iiankehn.slater2.model.PageSize
 import com.iiankehn.slater2.model.TableBlock
 import com.iiankehn.slater2.model.ImageBlock
+import com.iiankehn.slater2.model.ImageWrapping
 import com.iiankehn.slater2.model.WordProcessingDocument
 import com.iiankehn.slater2.ui.theme.CanvasBackground
 import com.iiankehn.slater2.ui.theme.CoreBlue
@@ -422,6 +430,12 @@ private fun WordProcessorWorkspace(
                         onToggle = ::toggle,
                         onUndo = { publish(editor.undo()) },
                         onRedo = { publish(editor.redo()) },
+                        onUpdateTableCell = { id, row, column, text -> publish(editor.updateTableCell(id, row, column, text)) },
+                        onResizeTable = { id, rows, columns -> publish(editor.resizeTable(id, rows, columns)) },
+                        onUpdateImage = { id, description, width, height, wrapping ->
+                            publish(editor.updateImage(id, description, width, height, wrapping))
+                        },
+                        onDeleteObject = { id -> publish(editor.deleteObject(id)) },
                     )
                 }
                 if (desktop && showInspector) InspectorPane(document, Modifier.width(280.dp).fillMaxHeight())
@@ -613,7 +627,20 @@ private fun Ruler(zoom: Int) {
 }
 
 @Composable
-private fun DocumentCanvas(value: TextFieldValue, document: WordProcessingDocument, zoom: Int, focusRequester: FocusRequester, onValueChange: (TextFieldValue) -> Unit, onToggle: (RichTextStyle) -> Unit, onUndo: () -> Unit, onRedo: () -> Unit) {
+private fun DocumentCanvas(
+    value: TextFieldValue,
+    document: WordProcessingDocument,
+    zoom: Int,
+    focusRequester: FocusRequester,
+    onValueChange: (TextFieldValue) -> Unit,
+    onToggle: (RichTextStyle) -> Unit,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onUpdateTableCell: (String, Int, Int, String) -> Unit,
+    onResizeTable: (String, Int, Int) -> Unit,
+    onUpdateImage: (String, String, Float?, Float?, ImageWrapping) -> Unit,
+    onDeleteObject: (String) -> Unit,
+) {
     val page = document.sections.first().page
     Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 28.dp), contentAlignment = Alignment.TopCenter) {
         Surface(
@@ -621,7 +648,7 @@ private fun DocumentCanvas(value: TextFieldValue, document: WordProcessingDocume
             color = Paper, contentColor = PaperText, shape = RoundedCornerShape(3.dp), shadowElevation = 4.dp,
         ) {
             Column {
-                StructuredObjects(document)
+                StructuredObjects(document, onUpdateTableCell, onResizeTable, onUpdateImage, onDeleteObject)
                 BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
@@ -652,18 +679,117 @@ private fun DocumentCanvas(value: TextFieldValue, document: WordProcessingDocume
 }
 
 @Composable
-private fun StructuredObjects(document: WordProcessingDocument) {
+private fun StructuredObjects(
+    document: WordProcessingDocument,
+    onUpdateTableCell: (String, Int, Int, String) -> Unit,
+    onResizeTable: (String, Int, Int) -> Unit,
+    onUpdateImage: (String, String, Float?, Float?, ImageWrapping) -> Unit,
+    onDeleteObject: (String) -> Unit,
+) {
     val objects = document.sections.flatMap { it.blocks }.filter { it is TableBlock || it is ImageBlock }
     if (objects.isEmpty()) return
     Column(Modifier.fillMaxWidth().padding(horizontal = 72.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        objects.forEach { block ->
-            Surface(color = Color(0xFFF0F4FA), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Color(0xFFCAD3DF))) {
-                val label = when (block) {
-                    is TableBlock -> "Table · ${block.rows.size} × ${block.rows.first().cells.size}"
-                    is ImageBlock -> "Picture · ${block.description.ifBlank { "No description" }}"
-                    else -> "Object"
+        objects.forEach { block -> when (block) {
+            is TableBlock -> EditableTable(block, onUpdateTableCell, onResizeTable, onDeleteObject)
+            is ImageBlock -> EditableImage(block, onUpdateImage, onDeleteObject)
+            else -> Unit
+        }
+        }
+    }
+}
+
+@Composable
+private fun EditableTable(
+    table: TableBlock,
+    onUpdateCell: (String, Int, Int, String) -> Unit,
+    onResize: (String, Int, Int) -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    val columnCount = table.rows.first().cells.size
+    Surface(color = Color(0xFFF7F9FC), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Color(0xFFCAD3DF))) {
+        Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Table · ${table.rows.size} × $columnCount", color = PaperText, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                TextButton(onClick = { onResize(table.id, table.rows.size + 1, columnCount) }) { Text("+ Row") }
+                TextButton(onClick = { onResize(table.id, table.rows.size, columnCount + 1) }) { Text("+ Column") }
+                TextButton(onClick = { onDelete(table.id) }) { Text("Delete") }
+            }
+            table.rows.forEachIndexed { rowIndex, row ->
+                Row(Modifier.fillMaxWidth()) {
+                    row.cells.forEachIndexed { columnIndex, cell ->
+                        val text = cell.blocks.joinToString("\n") { paragraph -> paragraph.runs.joinToString("") { it.text } }
+                        Surface(Modifier.weight(1f), color = Paper, border = BorderStroke(1.dp, Color(0xFFCAD3DF))) {
+                            BasicTextField(
+                                value = text,
+                                onValueChange = { onUpdateCell(table.id, rowIndex, columnIndex, it) },
+                                textStyle = TextStyle(color = PaperText, fontSize = 14.sp),
+                                cursorBrush = SolidColor(CoreBlue),
+                                modifier = Modifier.fillMaxWidth().padding(9.dp),
+                                decorationBox = { inner ->
+                                    if (text.isEmpty()) Text("Cell", color = PaperText.copy(alpha = 0.38f), fontSize = 14.sp)
+                                    inner()
+                                },
+                            )
+                        }
+                    }
                 }
-                Text(label, modifier = Modifier.fillMaxWidth().padding(12.dp), color = PaperText, fontWeight = FontWeight.Medium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditableImage(
+    image: ImageBlock,
+    onUpdate: (String, String, Float?, Float?, ImageWrapping) -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    val context = LocalContext.current
+    val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, image.sourceUri) {
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.openInputStream(Uri.parse(image.sourceUri))?.use { stream ->
+                    BitmapFactory.decodeStream(stream)
+                }?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    val width = image.widthPoints ?: 300f
+    val height = image.heightPoints ?: 200f
+    Surface(color = Color(0xFFF7F9FC), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Color(0xFFCAD3DF))) {
+        Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap!!,
+                    contentDescription = image.description.ifBlank { "Inserted picture" },
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.widthIn(max = width.coerceIn(120f, 720f).dp).fillMaxWidth().heightIn(max = height.coerceIn(120f, 420f).dp),
+                )
+            } else {
+                Box(Modifier.fillMaxWidth().height(120.dp).background(Color(0xFFE8EDF5), RoundedCornerShape(6.dp)), contentAlignment = Alignment.Center) {
+                    Text("Picture preview unavailable", color = PaperText.copy(alpha = 0.62f))
+                }
+            }
+            BasicTextField(
+                value = image.description,
+                onValueChange = { onUpdate(image.id, it, image.widthPoints, image.heightPoints, image.wrapping) },
+                textStyle = TextStyle(color = PaperText, fontSize = 14.sp),
+                cursorBrush = SolidColor(CoreBlue),
+                modifier = Modifier.fillMaxWidth().background(Paper, RoundedCornerShape(6.dp)).padding(9.dp),
+                decorationBox = { inner ->
+                    if (image.description.isBlank()) Text("Describe this picture for accessibility", color = PaperText.copy(alpha = 0.42f), fontSize = 14.sp)
+                    inner()
+                },
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = { onUpdate(image.id, image.description, (width - 36f).coerceAtLeast(72f), (height - 24f).coerceAtLeast(48f), image.wrapping) }) { Text("Smaller") }
+                TextButton(onClick = { onUpdate(image.id, image.description, width + 36f, height + 24f, image.wrapping) }) { Text("Larger") }
+                TextButton(onClick = {
+                    val next = ImageWrapping.entries[(image.wrapping.ordinal + 1) % ImageWrapping.entries.size]
+                    onUpdate(image.id, image.description, image.widthPoints, image.heightPoints, next)
+                }) { Text(image.wrapping.name) }
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = { onDelete(image.id) }) { Text("Delete") }
             }
         }
     }

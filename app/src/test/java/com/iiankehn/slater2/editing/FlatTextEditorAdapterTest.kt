@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.iiankehn.slater2.model.TableBlock
 import com.iiankehn.slater2.model.ImageBlock
+import com.iiankehn.slater2.model.ImageWrapping
 
 class FlatTextEditorAdapterTest {
     @Test fun `ime replacement becomes an undoable R2 transaction`() {
@@ -35,6 +36,40 @@ class FlatTextEditorAdapterTest {
         assertTrue(adapter.document.sections.single().blocks.any { it is ImageBlock })
         adapter.undo()
         assertTrue(adapter.document.sections.single().blocks.none { it is ImageBlock })
+    }
+
+    @Test fun `table cells and dimensions are editable and undoable`() {
+        val adapter = FlatTextEditorAdapter(document("One"))
+        adapter.insertTable(3, 3)
+        val table = adapter.document.sections.single().blocks.filterIsInstance<TableBlock>().single()
+
+        adapter.updateTableCell(table.id, 0, 0, "Quarter\nRevenue")
+        adapter.resizeTable(table.id, 3, 4)
+
+        val updated = adapter.document.sections.single().blocks.filterIsInstance<TableBlock>().single()
+        assertEquals(3, updated.rows.size)
+        assertEquals(4, updated.rows.first().cells.size)
+        assertEquals(listOf("Quarter", "Revenue"), updated.rows.first().cells.first().blocks.map { paragraph ->
+            paragraph.runs.joinToString("") { it.text }
+        })
+        adapter.undo()
+        assertEquals(2, adapter.document.sections.single().blocks.filterIsInstance<TableBlock>().single().rows.size)
+    }
+
+    @Test fun `image properties and object deletion are undoable`() {
+        val adapter = FlatTextEditorAdapter(document("One"))
+        adapter.insertImage(3, 3, "content://picture", "Chart")
+        val image = adapter.document.sections.single().blocks.filterIsInstance<ImageBlock>().single()
+
+        adapter.updateImage(image.id, "Quarterly chart", 360f, 240f, ImageWrapping.Square)
+        val updated = adapter.document.sections.single().blocks.filterIsInstance<ImageBlock>().single()
+        assertEquals("Quarterly chart", updated.description)
+        assertEquals(ImageWrapping.Square, updated.wrapping)
+
+        adapter.deleteObject(image.id)
+        assertTrue(adapter.document.sections.single().blocks.none { it is ImageBlock })
+        adapter.undo()
+        assertTrue(adapter.document.sections.single().blocks.any { it is ImageBlock })
     }
 
     private fun document(text: String) = WordProcessingDocument(

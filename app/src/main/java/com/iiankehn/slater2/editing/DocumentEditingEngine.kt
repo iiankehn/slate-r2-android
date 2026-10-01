@@ -11,6 +11,7 @@ import com.iiankehn.slater2.model.TableBlock
 import com.iiankehn.slater2.model.TableCell
 import com.iiankehn.slater2.model.TableRow
 import com.iiankehn.slater2.model.ImageBlock
+import com.iiankehn.slater2.model.ImageWrapping
 import com.iiankehn.slater2.model.ParagraphBlock
 import com.iiankehn.slater2.model.ParagraphStyle
 import com.iiankehn.slater2.model.TextRun
@@ -59,6 +60,16 @@ sealed interface DocumentCommand {
     data object InsertPageBreak : DocumentCommand
     data class InsertTable(val rows: Int = 2, val columns: Int = 2) : DocumentCommand
     data class InsertImage(val sourceUri: String, val description: String = "") : DocumentCommand
+    data class UpdateTableCell(val tableId: String, val row: Int, val column: Int, val text: String) : DocumentCommand
+    data class ResizeTable(val tableId: String, val rows: Int, val columns: Int) : DocumentCommand
+    data class UpdateImage(
+        val imageId: String,
+        val description: String,
+        val widthPoints: Float?,
+        val heightPoints: Float?,
+        val wrapping: ImageWrapping,
+    ) : DocumentCommand
+    data class DeleteObject(val objectId: String) : DocumentCommand
 }
 
 data class EditorSnapshot(
@@ -105,6 +116,10 @@ class DocumentEditingEngine(
             is DocumentCommand.InsertImage -> insertBlock(snapshot, ImageBlock(
                 id = "image-${UUID.randomUUID()}", sourceUri = command.sourceUri, description = command.description,
             ))
+            is DocumentCommand.UpdateTableCell -> updateTableCell(snapshot, command)
+            is DocumentCommand.ResizeTable -> resizeTable(snapshot, command)
+            is DocumentCommand.UpdateImage -> updateImage(snapshot, command)
+            is DocumentCommand.DeleteObject -> deleteObject(snapshot, command.objectId)
         }
         return EditResult(updated, updated != snapshot)
     }
@@ -133,6 +148,69 @@ class DocumentEditingEngine(
             snapshot.document.replaceSection(position.sectionIndex, section.copy(blocks = blocks)),
             DocumentSelection(DocumentPosition(position.sectionIndex, insertionIndex + 1, 0)),
         )
+    }
+
+    private fun updateTableCell(
+        snapshot: EditorSnapshot,
+        command: DocumentCommand.UpdateTableCell,
+    ): EditorSnapshot = snapshot.updateObject(command.tableId) { block ->
+        val table = block as? TableBlock ?: return@updateObject block
+        if (command.row !in table.rows.indices || command.column !in table.rows[command.row].cells.indices) return@updateObject block
+        table.copy(rows = table.rows.mapIndexed { rowIndex, row ->
+            if (rowIndex != command.row) row else row.copy(cells = row.cells.mapIndexed { columnIndex, cell ->
+                if (columnIndex != command.column) cell else {
+                    val paragraph = cell.blocks.first()
+                    val style = paragraph.runs.first().style
+                    cell.copy(blocks = command.text.split('\n').mapIndexed { index, text ->
+                        paragraph.copy(
+                            id = if (index == 0) paragraph.id else paragraphIdFactory(),
+                            runs = listOf(TextRun(text, style)),
+                        )
+                    })
+                }
+            })
+        })
+    }
+
+    private fun resizeTable(
+        snapshot: EditorSnapshot,
+        command: DocumentCommand.ResizeTable,
+    ): EditorSnapshot = snapshot.updateObject(command.tableId) { block ->
+        val table = block as? TableBlock ?: return@updateObject block
+        val rows = command.rows.coerceIn(1, 100)
+        val columns = command.columns.coerceIn(1, 20)
+        table.copy(
+            rows = List(rows) { rowIndex ->
+                TableRow(List(columns) { columnIndex ->
+                    table.rows.getOrNull(rowIndex)?.cells?.getOrNull(columnIndex) ?: TableCell()
+                })
+            },
+            headerRowCount = table.headerRowCount.coerceAtMost(rows),
+        )
+    }
+
+    private fun updateImage(
+        snapshot: EditorSnapshot,
+        command: DocumentCommand.UpdateImage,
+    ): EditorSnapshot = snapshot.updateObject(command.imageId) { block ->
+        val image = block as? ImageBlock ?: return@updateObject block
+        image.copy(
+            description = command.description,
+            widthPoints = command.widthPoints?.coerceIn(24f, 1200f),
+            heightPoints = command.heightPoints?.coerceIn(24f, 1200f),
+            wrapping = command.wrapping,
+        )
+    }
+
+    private fun deleteObject(snapshot: EditorSnapshot, objectId: String): EditorSnapshot {
+        var removed = false
+        val sections = snapshot.document.sections.map { section ->
+            val filtered = section.blocks.filterNot {
+                (it.id == objectId && it !is ParagraphBlock).also { match -> removed = removed || match }
+            }
+            section.copy(blocks = filtered.ifEmpty { listOf(ParagraphBlock(id = paragraphIdFactory())) })
+        }
+        return if (!removed) snapshot else snapshot.copy(document = snapshot.document.copy(sections = sections).touch())
     }
 
     private fun replaceSelection(snapshot: EditorSnapshot, insertedText: String): EditorSnapshot {
@@ -285,6 +363,19 @@ class DocumentEditingEngine(
         }
         return snapshot.copy(document = snapshot.document.copy(sections = sections).touch())
     }
+}
+
+private fun EditorSnapshot.updateObject(
+    objectId: String,
+    transform: (DocumentBlock) -> DocumentBlock,
+): EditorSnapshot {
+    var changed = false
+    val sections = document.sections.map { section ->
+        section.copy(blocks = section.blocks.map { block ->
+            if (block.id != objectId) block else transform(block).also { changed = changed || it != block }
+        })
+    }
+    return if (!changed) this else copy(document = document.copy(sections = sections).touch())
 }
 
 /** Mutable session boundary; each command or transaction is a single durable undo step. */

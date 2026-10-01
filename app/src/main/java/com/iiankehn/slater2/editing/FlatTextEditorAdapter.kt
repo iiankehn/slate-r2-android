@@ -6,6 +6,7 @@ import com.iiankehn.slater2.model.NamedParagraphStyle
 import com.iiankehn.slater2.model.WordProcessingDocument
 import com.iiankehn.slater2.model.ListKind
 import com.iiankehn.slater2.model.PageSetup
+import com.iiankehn.slater2.model.ImageWrapping
 
 data class FlatEditorState(val text: String, val selectionStart: Int, val selectionEnd: Int)
 
@@ -76,6 +77,32 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
     fun insertImage(start: Int, end: Int, sourceUri: String, description: String = ""): FlatEditorState {
         session.updateSelection(DocumentSelection(index.position(start), index.position(end)))
         session.execute(DocumentCommand.InsertImage(sourceUri, description))
+        return state()
+    }
+
+    fun updateTableCell(tableId: String, row: Int, column: Int, text: String): FlatEditorState {
+        session.execute(DocumentCommand.UpdateTableCell(tableId, row, column, text))
+        return state()
+    }
+
+    fun resizeTable(tableId: String, rows: Int, columns: Int): FlatEditorState {
+        session.execute(DocumentCommand.ResizeTable(tableId, rows, columns))
+        return state()
+    }
+
+    fun updateImage(
+        imageId: String,
+        description: String,
+        widthPoints: Float?,
+        heightPoints: Float?,
+        wrapping: ImageWrapping,
+    ): FlatEditorState {
+        session.execute(DocumentCommand.UpdateImage(imageId, description, widthPoints, heightPoints, wrapping))
+        return state()
+    }
+
+    fun deleteObject(objectId: String): FlatEditorState {
+        session.execute(DocumentCommand.DeleteObject(objectId))
         return state()
     }
 
