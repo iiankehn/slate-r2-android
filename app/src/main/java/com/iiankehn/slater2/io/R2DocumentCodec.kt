@@ -159,7 +159,7 @@ object R2DocumentCodec {
         return ByteArray(size).also { readFully(it) }.toString(Charsets.UTF_8)
     }
 
-    private fun DataOutputStream.writeNullableString(value: String?) { writeBoolean(value != null); value?.let(::writeString) }
+    private fun DataOutputStream.writeNullableString(value: String?) { writeBoolean(value != null); value?.let { writeString(it) } }
     private fun DataInputStream.readNullableString() = if (readBoolean()) readString() else null
     private fun DataOutputStream.writeNullableFloat(value: Float?) { writeBoolean(value != null); value?.let(::writeFloat) }
     private fun DataInputStream.readNullableFloat() = if (readBoolean()) readFloat() else null
