@@ -16,6 +16,7 @@ The current foundation includes:
 - a keyboard-safe command ribbon, page canvas, ruler, navigation pane, format inspector, and document status bar;
 - local persistence, recovery, and file interchange infrastructure carried forward without the R1 user interface;
 - a device-independent paginated document model with sections, page setup, margins, columns, paragraphs, text runs, lists, tables, and images;
+- an immutable editing engine with logical document positions, multi-paragraph selections, formatting commands, and transactional undo/redo;
 - deterministic workspace profiles for phone, tablet, foldable, and Googlebook Android layouts;
 - explicit touch, stylus, mouse/trackpad, and hardware-keyboard capability modeling;
 - architecture-neutral Kotlin code suitable for ARM64 and x86_64 devices;

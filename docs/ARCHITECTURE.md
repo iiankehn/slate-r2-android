@@ -9,6 +9,8 @@
 5. **Format adapters** — DOCX, Markdown, text, PDF, printing, and Android document-provider integration.
 6. **Workspace UI** — Compose surfaces that adapt chrome without changing document semantics.
 
+The editing layer represents carets and selections with section, block, and UTF-16 offsets. Commands return new document snapshots rather than mutating blocks in place. A bounded session history groups one or more commands into an atomic undo step and clears redo history whenever a new edit branch begins.
+
 ## R2 workspace boundary
 
 The application surface is independent from R1. It consists of a template-based start center and a document workspace with a command ribbon, page canvas, ruler, navigation pane, format inspector, and status bar. Phone layouts keep the ribbon visible above the IME; large windows add persistent side tools without changing the saved document.

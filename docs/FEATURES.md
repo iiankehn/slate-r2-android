@@ -7,8 +7,10 @@ Status values describe the development tree, not a public release.
 | Start center | Implemented with blank/template/open/recent flows | Search, pinned templates, cloud-provider shortcuts |
 | Local documents and recovery | Implemented behind the R2 workspace | R2 document payloads and atomic recovery |
 | Page setup | Model implemented | Interactive size, margins, orientation, columns |
-| Paragraphs and character runs | Model implemented | Complete selection and editing engine |
-| Named styles | Model implemented | Style gallery, inheritance, document themes |
+| Editing commands | Multi-paragraph replace/delete/format commands implemented | Tables, objects, and section-boundary editing |
+| Selection and history | Logical positions plus transactional undo/redo implemented | UI integration and durable recovery transactions |
+| Paragraphs and character runs | Model and multi-block transformations implemented | Complete IME composition and selection engine |
+| Named styles | Model and command application implemented | Style gallery, inheritance, document themes |
 | Lists | Model implemented | Bullets, numbering, multilevel lists, checklists |
 | Tables | Validated model implemented | Resize, merge, repeat headers, keyboard navigation |
 | Images | Model implemented | Resize, crop, wrapping, positioning, accessibility text |

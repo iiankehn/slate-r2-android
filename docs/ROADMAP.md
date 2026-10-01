@@ -14,8 +14,10 @@ R2 uses capability milestones rather than treating its name as a sequence after 
 
 ## Editing engine
 
-- Document positions, ranges, selections, and multi-block commands
-- Transactional undo/redo and durable recovery
+- [x] Document positions, directional selections, and multi-paragraph commands
+- [x] Immutable text, character-format, paragraph-style, and named-style operations
+- [x] Transactional bounded undo/redo foundation
+- Durable transaction recovery and versioned R2 persistence
 - IME-safe text editing and keyboard command routing
 - Named style application, paragraph controls, lists, and tabs
 
