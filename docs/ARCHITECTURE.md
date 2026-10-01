@@ -9,6 +9,10 @@
 5. **Format adapters** — DOCX, Markdown, text, PDF, printing, and Android document-provider integration.
 6. **Workspace UI** — Compose surfaces that adapt chrome without changing document semantics.
 
+## R2 workspace boundary
+
+The application surface is independent from R1. It consists of a template-based start center and a document workspace with a command ribbon, page canvas, ruler, navigation pane, format inspector, and status bar. Phone layouts keep the ribbon visible above the IME; large windows add persistent side tools without changing the saved document.
+
 ## Document units
 
 The core model stores page dimensions, margins, indents, spacing, and object sizes in points. Display code converts points to pixels using zoom and density; export code consumes the same units directly. This prevents device density from changing pagination.
@@ -30,4 +34,4 @@ The current Kotlin/Compose code is ABI-neutral. Native libraries may be introduc
 
 ## Compatibility bridge
 
-The inherited rich-text model remains available during foundation work. New word-processing documents use `WordProcessingDocument`; migration is explicit and versioned rather than silently reinterpreting existing content.
+The compatibility rich-text payload remains behind the new R2 workspace during foundation work so persistence, recovery, and basic interchange stay usable. It is an implementation bridge only: the R1 application surface is not retained. New word-processing documents use `WordProcessingDocument`; migration is explicit and versioned rather than silently reinterpreting existing content.

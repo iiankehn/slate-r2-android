@@ -12,7 +12,9 @@ The current foundation includes:
 
 - a distinct `com.iiankehn.slater2` Android application;
 - native Kotlin and Jetpack Compose targeting Android 12 and newer;
-- the proven local library, recovery, file interchange, and adaptive UI foundation from R1;
+- an independent R2 start center and responsive word-processing workspace;
+- a keyboard-safe command ribbon, page canvas, ruler, navigation pane, format inspector, and document status bar;
+- local persistence, recovery, and file interchange infrastructure carried forward without the R1 user interface;
 - a device-independent paginated document model with sections, page setup, margins, columns, paragraphs, text runs, lists, tables, and images;
 - deterministic workspace profiles for phone, tablet, foldable, and Googlebook Android layouts;
 - explicit touch, stylus, mouse/trackpad, and hardware-keyboard capability modeling;
@@ -26,7 +28,7 @@ R2 is intended to become a complete word processor rather than a larger notes ap
 - page layout, pagination, sections, headers, footers, columns, and print-aware units;
 - named styles, advanced paragraph controls, typography, lists, tabs, and spacing;
 - resizable tables and images with text wrapping;
-- document navigation, outline, rulers, inspectors, and a scalable ribbon;
+- deeper document navigation, live outline mapping, functional rulers and inspectors, and an extensible ribbon;
 - higher-fidelity DOCX interchange and deterministic PDF/print output;
 - responsive workspaces across all supported form factors and input methods.
 

@@ -233,27 +233,7 @@ class SlateViewModel(
     private companion object {
         const val AUTOSAVE_DELAY_MILLIS = 450L
 
-        val starterDocuments = listOf(
-            Document(
-                "welcome",
-                "Welcome to Slate",
-                RichTextDocument.plain("A calm place for notes, drafts, and complete documents.\n\nEverything starts on your device."),
-                "Just now",
-                true,
-            ),
-            Document(
-                "ideas",
-                "Project ideas",
-                RichTextDocument.plain("Build the smallest useful version first.\nKeep the editor fast.\nRespect the writer's privacy."),
-                "12 min ago",
-            ),
-            Document(
-                "meeting",
-                "Meeting notes",
-                RichTextDocument.plain("Agenda\n\n• Current work\n• Decisions\n• Next steps"),
-                "Yesterday",
-            ),
-        )
+        val starterDocuments = emptyList<Document>()
     }
 }
 

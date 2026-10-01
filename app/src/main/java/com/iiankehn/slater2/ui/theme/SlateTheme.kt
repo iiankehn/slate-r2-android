@@ -3,7 +3,7 @@ package com.iiankehn.slater2.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -21,29 +21,32 @@ val SlateSurfaceRaised = Color(0xFF1B2530)
 val SlateBorder = Color(0xFF2A3744)
 val SlateText = Color(0xFFF1F5F9)
 val SlateTextMuted = Color(0xFFA7B4C2)
+val CanvasBackground = Color(0xFFE3E7EC)
+val Paper = Color(0xFFFFFBFF)
+val PaperText = Color(0xFF1A1C1E)
 
-private val SlateColors = darkColorScheme(
-    primary = CoreBlueLight,
-    onPrimary = Color(0xFF00344F),
-    primaryContainer = Color(0xFF004B73),
-    onPrimaryContainer = Color(0xFFCBE6FF),
-    secondary = Color(0xFFB8C8D8),
-    onSecondary = Color(0xFF23323F),
-    secondaryContainer = Color(0xFF344956),
-    onSecondaryContainer = Color(0xFFD4E5F5),
-    background = Midnight,
-    onBackground = SlateText,
-    surface = SlateSurface,
-    onSurface = SlateText,
-    surfaceVariant = SlateSurfaceRaised,
-    onSurfaceVariant = SlateTextMuted,
-    surfaceContainer = SlateSurfaceSoft,
-    surfaceContainerHigh = SlateSurfaceRaised,
-    surfaceContainerHighest = Color(0xFF24313E),
-    outline = Color(0xFF4A5A69),
-    outlineVariant = SlateBorder,
-    error = Color(0xFFFFB4AB),
-    onError = Color(0xFF690005),
+private val SlateColors = lightColorScheme(
+    primary = CoreBlue,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFD1E9FF),
+    onPrimaryContainer = Color(0xFF001D33),
+    secondary = Color(0xFF52616F),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFD6E5F4),
+    onSecondaryContainer = Color(0xFF0E1D29),
+    background = Color(0xFFF6F8FA),
+    onBackground = Color(0xFF191C1E),
+    surface = Color(0xFFFCFCFF),
+    onSurface = Color(0xFF191C1E),
+    surfaceVariant = Color(0xFFDDE3EA),
+    onSurfaceVariant = Color(0xFF41484D),
+    surfaceContainer = Color(0xFFEEF2F5),
+    surfaceContainerHigh = Color(0xFFE7EBEF),
+    surfaceContainerHighest = Color(0xFFDFE4E8),
+    outline = Color(0xFF72787E),
+    outlineVariant = Color(0xFFC1C7CD),
+    error = Color(0xFFBA1A1A),
+    onError = Color.White,
     scrim = Color.Black,
 )
 

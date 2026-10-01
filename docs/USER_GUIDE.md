@@ -6,11 +6,17 @@ There is no public R2 user release yet. This document describes the current deve
 
 Run `gradle --no-daemon assembleDebug`, then install `app/build/outputs/apk/debug/app-debug.apk`. The package is `com.iiankehn.slater2`, so it can coexist with Slate R1.
 
-## Current behavior
+## Start center
 
-The development build retains R1's local library, autosave/recovery foundation, rich-text editing, file adapters, and adaptive phone/large-window shell while the R2 document and layout engines are built behind it.
+R2 opens to a document-focused start center. Create a blank document, start from the report, letter, or résumé templates, open an existing DOCX/Markdown/text file, or return to a recent document. R2 does not use R1's notes-library interface.
 
-Do not treat the current editor's format fidelity or page behavior as the final R2 contract. The roadmap tracks the replacement of legacy editing paths with the paginated R2 engine.
+## Word-processing workspace
+
+The workspace provides File, Home, Insert, Layout, Review, and View ribbon tabs. The ribbon stays above the document when the software keyboard opens. The current build also includes a page canvas, ruler, word/page/character status, zoom controls, keyboard formatting shortcuts, and responsive navigation and formatting panels on larger windows.
+
+Use the system Back action or **Start** to return from a document to the start center. File actions support opening documents, exporting text/Markdown/DOCX/PDF, sharing, printing, and checking for updates.
+
+The current canvas uses the compatibility rich-text payload while the deterministic multi-page R2 editing and layout engines are completed. Page estimates and several advanced ribbon commands are therefore previews, not the final format-fidelity contract.
 
 ## Reporting development problems
 

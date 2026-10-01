@@ -8,6 +8,8 @@ R2 uses capability milestones rather than treating its name as a sequence after 
 - Device-independent word-processing document model
 - Page setup, paragraph/run styles, lists, tables, images, and metadata
 - Adaptive workspace policy for all target form factors and inputs
+- Independent start center and word-processing workspace replacing the R1-derived shell
+- Persistent ribbon, page canvas, ruler, navigation, inspector, status, and zoom surfaces
 - Tests for model invariants and workspace behavior
 
 ## Editing engine

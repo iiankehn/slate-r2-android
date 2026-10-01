@@ -4,7 +4,8 @@ Status values describe the development tree, not a public release.
 
 | Area | Foundation | Target |
 |---|---|---|
-| Local library and recovery | Inherited and compiling | R2 document payloads and atomic recovery |
+| Start center | Implemented with blank/template/open/recent flows | Search, pinned templates, cloud-provider shortcuts |
+| Local documents and recovery | Implemented behind the R2 workspace | R2 document payloads and atomic recovery |
 | Page setup | Model implemented | Interactive size, margins, orientation, columns |
 | Paragraphs and character runs | Model implemented | Complete selection and editing engine |
 | Named styles | Model implemented | Style gallery, inheritance, document themes |
@@ -14,9 +15,10 @@ Status values describe the development tree, not a public release.
 | Pagination | Architecture defined | Deterministic on-screen, PDF, and print layout |
 | DOCX | Basic inherited adapter | Higher-fidelity OOXML import/export |
 | PDF and printing | Basic inherited path | Page-accurate output from the layout engine |
-| Phone workspace | R1-derived shell | Complete compact word-processing workflow |
-| Tablet/foldable | Workspace policy implemented | Multi-pane editor, inspector, rulers |
-| Googlebook Android | Workspace policy implemented | Full ribbon and desktop-class input behavior |
+| Ribbon and page workspace | Independent R2 surface implemented | Connect every advanced command to the editing engine |
+| Phone workspace | Compact persistent ribbon and fit-width page | Complete compact word-processing workflow |
+| Tablet/foldable | Page canvas, ruler, persistent navigation | Multi-page editor and collapsible inspector |
+| Googlebook Android | Full-width ribbon, navigation, inspector, shortcuts | Desktop-class editing and pointer behavior |
 | ARM64/x86_64 | ABI-neutral foundation | Verified release coverage |
 
 ## Input contract
