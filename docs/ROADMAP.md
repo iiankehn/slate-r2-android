@@ -17,27 +17,30 @@ R2 uses capability milestones rather than treating its name as a sequence after 
 - [x] Document positions, directional selections, and multi-paragraph commands
 - [x] Immutable text, character-format, paragraph-style, and named-style operations
 - [x] Transactional bounded undo/redo foundation
-- Durable transaction recovery and versioned R2 persistence
-- IME-safe text editing and keyboard command routing
-- Named style application, paragraph controls, lists, and tabs
+- [x] Durable recovery records and versioned R2 persistence with legacy migration
+- [x] IME-safe diff routing plus keyboard formatting and undo/redo
+- [x] Named style, list, page-break, and page-setup command routing
+- Tabs, advanced list levels, section-boundary editing, and object selections
 
 ## Layout engine
 
-- Line breaking, pagination, sections, columns, headers, and footers
-- Zoom, rulers, page thumbnails, outline, and navigation
-- Tables and image measurement with text wrapping
-- Shared on-screen, PDF, and print geometry
+- [x] Deterministic line breaking, pagination, columns, headers, and footers
+- [x] Zoom, ruler, outline/navigation surfaces, and computed page counts
+- [x] Tables and inline image measurement
+- [x] Shared pagination geometry for status, PDF, and print
+- Multi-page editable canvas, thumbnails, floating-object wrapping, and section-continuation rules
 
 ## Interchange
 
-- Versioned R2 storage payload
-- Higher-fidelity DOCX import/export with explicit compatibility reporting
-- Deterministic PDF and printing
-- Markdown and plain-text boundary adapters
+- [x] Versioned, bounded R2 storage payload
+- [x] DOCX export for styled runs, tables, sections, page setup, and columns
+- [x] Deterministic PDF and printing from the layout engine
+- [x] Markdown and plain-text boundary adapters
+- Rich DOCX import, embedded image relationships, headers/footers, and round-trip fidelity fixtures
 
 ## Release readiness
 
-- Accessibility and large-document performance
-- ARM64 and x86_64 CI/device validation
+- Accessibility semantics audit and large-document performance profiling
+- [x] ARM64 and x86_64 native-dependency validation in CI
 - Phone, tablet, foldable, and Googlebook Android acceptance matrix
-- Signed updater and monthly release publication
+- Signed updater and monthly publication (requires repository signing secrets)

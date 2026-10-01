@@ -11,6 +11,8 @@
 
 The editing layer represents carets and selections with section, block, and UTF-16 offsets. Commands return new document snapshots rather than mutating blocks in place. A bounded session history groups one or more commands into an atomic undo step and clears redo history whenever a new edit branch begins.
 
+`FlatTextEditorAdapter` converts Compose/IME text diffs into engine selections and commands. The widget never writes Room rows directly. Formatting, lists, page breaks, page setup, undo, and redo therefore share one command history.
+
 ## R2 workspace boundary
 
 The application surface is independent from R1. It consists of a template-based start center and a document workspace with a command ribbon, page canvas, ruler, navigation pane, format inspector, and status bar. Phone layouts keep the ribbon visible above the IME; large windows add persistent side tools without changing the saved document.
@@ -36,4 +38,6 @@ The current Kotlin/Compose code is ABI-neutral. Native libraries may be introduc
 
 ## Compatibility bridge
 
-The compatibility rich-text payload remains behind the new R2 workspace during foundation work so persistence, recovery, and basic interchange stay usable. It is an implementation bridge only: the R1 application surface is not retained. New word-processing documents use `WordProcessingDocument`; migration is explicit and versioned rather than silently reinterpreting existing content.
+Room schema version 3 stores a bounded, versioned `WordProcessingDocument` payload in both the document and recovery tables. Existing schema-v2 rows are migrated with an empty payload and promoted on first read. A normalized rich-text mirror remains only for text/Markdown compatibility and safe downgrade recovery; the R2 model is authoritative for editor commands, layout, DOCX, PDF, and print.
+
+The binary codec validates its signature, version, string sizes, collection sizes, enum ordinals, and trailing data before constructing a model. Corrupt payloads fall back to the legacy mirror rather than making a document inaccessible.

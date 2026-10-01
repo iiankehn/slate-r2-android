@@ -8,6 +8,7 @@ import com.iiankehn.slater2.model.Document
 import com.iiankehn.slater2.model.DocumentTitlePolicy
 import com.iiankehn.slater2.model.RichTextDocument
 import com.iiankehn.slater2.io.ImportedDocument
+import com.iiankehn.slater2.io.R2DocumentBridge
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -59,7 +60,7 @@ class SlateViewModel(
             title = "",
             body = RichTextDocument(),
             updatedLabel = "Just now",
-        )
+        ).withSynchronizedR2()
         updateLocal(document)
         scheduleSave(document, delayMillis = 0)
         return document
@@ -71,14 +72,14 @@ class SlateViewModel(
             title = imported.title,
             body = imported.body,
             updatedLabel = "Imported now",
-        )
+        ).withSynchronizedR2()
         updateLocal(document)
         scheduleSave(document, delayMillis = 0)
         return document
     }
 
     fun updateDocument(document: Document) {
-        val changed = document.copy(
+        val changed = document.withSynchronizedR2().copy(
             updatedLabel = "Just now",
             updatedAtEpochMillis = nextTimestamp(document),
         )
@@ -96,7 +97,7 @@ class SlateViewModel(
             isArchived = false,
             isDeleted = false,
             updatedAtEpochMillis = nextTimestamp(source),
-        )
+        ).withSynchronizedR2(force = true)
         updateLocal(duplicate)
         scheduleSave(duplicate, delayMillis = 0)
         return duplicate
@@ -150,6 +151,7 @@ class SlateViewModel(
             current.copy(
                 title = version.title,
                 body = version.body,
+                wordProcessingDocument = version.wordProcessingDocument,
                 folder = version.folder,
                 tags = version.tags,
             ),
@@ -249,3 +251,12 @@ private fun nextTimestamp(document: Document): Long = maxOf(
     System.currentTimeMillis(),
     document.updatedAtEpochMillis + 1,
 )
+
+private fun Document.withSynchronizedR2(force: Boolean = false): Document {
+    val current = wordProcessingDocument
+    val contentMatches = current != null && R2DocumentBridge.toLegacyBody(current) == body.normalized()
+    val r2 = if (!force && contentMatches) current.copy(id = id, title = title) else {
+        R2DocumentBridge.fromLegacy(copy(wordProcessingDocument = null))
+    }
+    return copy(wordProcessingDocument = r2)
+}

@@ -79,10 +79,19 @@ import androidx.compose.ui.unit.sp
 import com.iiankehn.slater2.SlateViewModel
 import com.iiankehn.slater2.io.AndroidDocumentActions
 import com.iiankehn.slater2.io.DocumentFormats
+import com.iiankehn.slater2.io.R2DocumentBridge
+import com.iiankehn.slater2.editing.CharacterFormat
+import com.iiankehn.slater2.editing.FlatTextEditorAdapter
+import com.iiankehn.slater2.layout.DocumentLayoutEngine
 import com.iiankehn.slater2.model.Document
 import com.iiankehn.slater2.model.DocumentTitlePolicy
 import com.iiankehn.slater2.model.RichTextDocument
 import com.iiankehn.slater2.model.RichTextStyle
+import com.iiankehn.slater2.model.NamedParagraphStyle
+import com.iiankehn.slater2.model.ListKind
+import com.iiankehn.slater2.model.PageMargins
+import com.iiankehn.slater2.model.PageOrientation
+import com.iiankehn.slater2.model.PageSize
 import com.iiankehn.slater2.ui.theme.CanvasBackground
 import com.iiankehn.slater2.ui.theme.CoreBlue
 import com.iiankehn.slater2.ui.theme.Paper
@@ -93,6 +102,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private enum class RibbonTab { File, Home, Insert, Layout, Review, View }
+private enum class LayoutAction { Margins, Orientation, Size, Columns }
 private enum class ExportFormat(val extension: String, val mime: String) {
     Text("txt", "text/plain"),
     Markdown("md", "text/markdown"),
@@ -147,7 +157,7 @@ fun SlateR2App(viewModel: SlateViewModel) {
                     val bytes = when (request.format) {
                         ExportFormat.Text -> DocumentFormats.exportText(request.document.body)
                         ExportFormat.Markdown -> DocumentFormats.exportMarkdown(request.document.body)
-                        ExportFormat.Docx -> DocumentFormats.exportDocx(request.document.title, request.document.body)
+                        ExportFormat.Docx -> DocumentFormats.exportDocx(request.document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(request.document))
                         ExportFormat.Pdf -> AndroidDocumentActions.renderPdf(request.document)
                     }
                     context.contentResolver.openOutputStream(uri, "w")?.use { it.write(bytes) }
@@ -313,21 +323,46 @@ private fun WordProcessorWorkspace(
     var showNavigation by remember { mutableStateOf(true) }
     var showInspector by remember { mutableStateOf(true) }
     var zoom by remember { mutableStateOf(100) }
-    var editorValue by remember(document.id) { mutableStateOf(TextFieldValue(annotatedBody(document.body))) }
+    val editor = remember(document.id) { FlatTextEditorAdapter(document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)) }
+    var editorValue by remember(document.id) { mutableStateOf(TextFieldValue(annotatedBody(editor.legacyBody()))) }
     val focusRequester = remember { FocusRequester() }
-    fun applyBody(body: RichTextDocument, selection: TextRange = editorValue.selection) {
+    fun publish(state: com.iiankehn.slater2.editing.FlatEditorState) {
+        val body = editor.legacyBody()
+        val selection = TextRange(state.selectionStart, state.selectionEnd)
         editorValue = TextFieldValue(annotatedBody(body), selection.coerceIn(0, body.text.length))
-        onChange(document.copy(body = body))
+        onChange(document.copy(body = body, wordProcessingDocument = editor.document.copy(title = document.title)))
     }
     fun toggle(style: RichTextStyle) {
-        val range = selectionOrWordRange(document.body.text, editorValue.selection)
-        applyBody(document.body.toggle(style, range.start, range.end), range)
+        val range = selectionOrWordRange(editorValue.text, editorValue.selection)
+        val state = when (style) {
+            RichTextStyle.Bold -> editor.toggle(CharacterFormat.Bold, range.start, range.end)
+            RichTextStyle.Italic -> editor.toggle(CharacterFormat.Italic, range.start, range.end)
+            RichTextStyle.Underline, RichTextStyle.Link -> editor.toggle(CharacterFormat.Underline, range.start, range.end)
+            RichTextStyle.HeadingOne -> editor.applyNamedStyle(NamedParagraphStyle.Heading1, range.start, range.end)
+            RichTextStyle.Quote -> editor.applyNamedStyle(NamedParagraphStyle.Quote, range.start, range.end)
+            else -> return
+        }
+        publish(state)
     }
     fun insert(text: String) {
         val selection = editorValue.selection.coerceIn(0, document.body.text.length)
-        val body = document.body.updateText(document.body.text.replaceRange(selection.min, selection.max, text))
-        applyBody(body, TextRange(selection.min + text.length))
+        val nextText = editorValue.text.replaceRange(selection.min, selection.max, text)
+        publish(editor.replace(nextText, selection.min + text.length, selection.min + text.length))
         focusRequester.requestFocus()
+    }
+    fun toggleList(kind: ListKind) {
+        val range = selectionOrWordRange(editorValue.text, editorValue.selection)
+        publish(editor.toggleList(kind, range.start, range.end))
+    }
+    fun updateLayout(action: LayoutAction) {
+        val page = editor.document.sections.first().page
+        val updated = when (action) {
+            LayoutAction.Margins -> page.copy(margins = if (page.margins.topPoints == 72f) PageMargins(36f, 36f, 36f, 36f) else PageMargins())
+            LayoutAction.Orientation -> page.copy(orientation = if (page.orientation == PageOrientation.Portrait) PageOrientation.Landscape else PageOrientation.Portrait)
+            LayoutAction.Size -> page.copy(size = PageSize.entries[(page.size.ordinal + 1) % PageSize.entries.size])
+            LayoutAction.Columns -> page.copy(columns = page.columns % 4 + 1)
+        }
+        publish(editor.updatePageSetup(updated))
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
@@ -339,6 +374,9 @@ private fun WordProcessorWorkspace(
             Ribbon(
                 tab = activeTab, compact = !tablet, document = document, selection = editorValue.selection,
                 onToggle = ::toggle, onInsert = ::insert, onNew = onNew, onOpen = onImport,
+                onToggleList = ::toggleList,
+                onPageBreak = { publish(editor.insertPageBreak(editorValue.selection.min, editorValue.selection.max)) },
+                onLayout = ::updateLayout,
                 onExport = onExport, onShare = onShare, onPrint = onPrint, onCheckUpdates = onCheckUpdates,
                 showNavigation = showNavigation, showInspector = showInspector,
                 onToggleNavigation = { showNavigation = !showNavigation }, onToggleInspector = { showInspector = !showInspector },
@@ -352,11 +390,11 @@ private fun WordProcessorWorkspace(
                     DocumentCanvas(
                         value = editorValue, zoom = zoom, focusRequester = focusRequester,
                         onValueChange = { value ->
-                            val body = document.body.updateText(value.text)
-                            editorValue = value.copy(annotatedString = annotatedBody(body))
-                            onChange(document.copy(body = body))
+                            publish(editor.replace(value.text, value.selection.start, value.selection.end))
                         },
                         onToggle = ::toggle,
+                        onUndo = { publish(editor.undo()) },
+                        onRedo = { publish(editor.redo()) },
                     )
                 }
                 if (desktop && showInspector) InspectorPane(document, Modifier.width(280.dp).fillMaxHeight())
@@ -407,6 +445,9 @@ private fun Ribbon(
     selection: TextRange,
     onToggle: (RichTextStyle) -> Unit,
     onInsert: (String) -> Unit,
+    onToggleList: (ListKind) -> Unit,
+    onPageBreak: () -> Unit,
+    onLayout: (LayoutAction) -> Unit,
     onNew: () -> Unit,
     onOpen: () -> Unit,
     onExport: (ExportFormat) -> Unit,
@@ -433,14 +474,14 @@ private fun Ribbon(
                         RibbonCommand("I", { onToggle(RichTextStyle.Italic) }, document.body.hasStyle(RichTextStyle.Italic, selection.min, selection.max), italic = true)
                         RibbonCommand("U", { onToggle(RichTextStyle.Underline) }, document.body.hasStyle(RichTextStyle.Underline, selection.min, selection.max), underline = true)
                     }
-                    RibbonGroup("Paragraph") { RibbonCommand("Bullets", { onInsert("• ") }); RibbonCommand("Numbering", { onInsert("1. ") }); RibbonCommand("Quote", { onToggle(RichTextStyle.Quote) }) }
+                    RibbonGroup("Paragraph") { RibbonCommand("Bullets", { onToggleList(ListKind.Bulleted) }); RibbonCommand("Numbering", { onToggleList(ListKind.Numbered) }); RibbonCommand("Quote", { onToggle(RichTextStyle.Quote) }) }
                     RibbonGroup("Styles") { RibbonCommand("Title", { onToggle(RichTextStyle.HeadingOne) }); RibbonCommand("Normal", {}) }
                 }
                 RibbonTab.Insert -> {
-                    RibbonGroup("Pages") { RibbonCommand("Page break", { onInsert("\n\n— Page break —\n\n") }) }
+                    RibbonGroup("Pages") { RibbonCommand("Page break", onPageBreak) }
                     RibbonGroup("Content") { RibbonCommand("Table", { onInsert("\n| Column | Column |\n| — | — |\n|  |  |\n") }); RibbonCommand("Picture", { onInsert("[Image]\n") }); RibbonCommand("Link", { onToggle(RichTextStyle.Link) }) }
                 }
-                RibbonTab.Layout -> RibbonGroup("Page setup") { RibbonCommand("Margins", {}); RibbonCommand("Orientation", {}); RibbonCommand("Size", {}); RibbonCommand("Columns", {}) }
+                RibbonTab.Layout -> RibbonGroup("Page setup") { RibbonCommand("Margins", { onLayout(LayoutAction.Margins) }); RibbonCommand("Orientation", { onLayout(LayoutAction.Orientation) }); RibbonCommand("Size", { onLayout(LayoutAction.Size) }); RibbonCommand("Columns", { onLayout(LayoutAction.Columns) }) }
                 RibbonTab.Review -> {
                     RibbonGroup("Proofing") { RibbonCommand("Spelling", {}); RibbonCommand("Word count", {}) }
                     RibbonGroup("Changes") { RibbonCommand("Comment", { onInsert("[Comment] ") }); RibbonCommand("Track", {}) }
@@ -524,7 +565,7 @@ private fun Ruler(zoom: Int) {
 }
 
 @Composable
-private fun DocumentCanvas(value: TextFieldValue, zoom: Int, focusRequester: FocusRequester, onValueChange: (TextFieldValue) -> Unit, onToggle: (RichTextStyle) -> Unit) {
+private fun DocumentCanvas(value: TextFieldValue, zoom: Int, focusRequester: FocusRequester, onValueChange: (TextFieldValue) -> Unit, onToggle: (RichTextStyle) -> Unit, onUndo: () -> Unit, onRedo: () -> Unit) {
     Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 28.dp), contentAlignment = Alignment.TopCenter) {
         Surface(
             modifier = Modifier.widthIn(max = (760 * zoom / 100).dp).fillMaxWidth(),
@@ -544,6 +585,8 @@ private fun DocumentCanvas(value: TextFieldValue, zoom: Int, focusRequester: Foc
                             Key.B -> { onToggle(RichTextStyle.Bold); true }
                             Key.I -> { onToggle(RichTextStyle.Italic); true }
                             Key.U -> { onToggle(RichTextStyle.Underline); true }
+                            Key.Z -> { onUndo(); true }
+                            Key.Y -> { onRedo(); true }
                             else -> false
                         }
                     },
@@ -559,10 +602,13 @@ private fun DocumentCanvas(value: TextFieldValue, zoom: Int, focusRequester: Foc
 @Composable
 private fun StatusBar(document: Document, saving: Boolean, zoom: Int, onZoom: (Int) -> Unit) {
     val words = wordCount(document.body.text)
+    val pages = remember(document.wordProcessingDocument, document.body) {
+        DocumentLayoutEngine().layout(document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)).pageCount
+    }
     Surface(color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(if (saving) "Saving…" else "Saved locally", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("  •  Page 1 of ${estimatedPages(document.body.text)}  •  $words words  •  ${document.body.text.length} characters", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("  •  Page 1 of $pages  •  $words words  •  ${document.body.text.length} characters", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             TextButton(onClick = { onZoom((zoom - 25).coerceAtLeast(50)) }) { Text("−") }
             Text("$zoom%", style = MaterialTheme.typography.labelMedium)
             TextButton(onClick = { onZoom((zoom + 25).coerceAtMost(175)) }) { Text("+") }
@@ -571,7 +617,6 @@ private fun StatusBar(document: Document, saving: Boolean, zoom: Int, onZoom: (I
 }
 
 private fun wordCount(text: String): Int = text.trim().takeIf(String::isNotEmpty)?.split(Regex("\\s+"))?.size ?: 0
-private fun estimatedPages(text: String): Int = maxOf(1, (wordCount(text) + 449) / 450)
 
 private fun annotatedBody(body: RichTextDocument): AnnotatedString = AnnotatedString.Builder(body.text).apply {
     body.normalized().ranges.forEach { range ->

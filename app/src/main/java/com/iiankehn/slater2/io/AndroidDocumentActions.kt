@@ -3,6 +3,7 @@ package com.iiankehn.slater2.io
 import android.content.Context
 import android.content.Intent
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
 import android.os.Bundle
 import android.os.CancellationSignal
@@ -14,33 +15,40 @@ import android.print.PrintDocumentInfo
 import android.print.PrintManager
 import com.iiankehn.slater2.model.Document
 import com.iiankehn.slater2.model.DocumentTitlePolicy
+import com.iiankehn.slater2.model.WordProcessingDocument
+import com.iiankehn.slater2.layout.DocumentLayoutEngine
+import com.iiankehn.slater2.layout.FragmentKind
 import java.io.ByteArrayOutputStream
 import java.io.FileOutputStream
 
 object AndroidDocumentActions {
     fun renderPdf(document: Document): ByteArray {
+        val r2 = document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)
+        return renderPdf(r2)
+    }
+
+    fun renderPdf(document: WordProcessingDocument): ByteArray {
         val pdf = PdfDocument()
-        val title = DocumentTitlePolicy.displayTitle(document.title, document.body.text)
-        val lines = buildList {
-            add(title)
-            add("")
-            document.body.text.lines().forEach(::add)
+        val layout = DocumentLayoutEngine().layout(document)
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 11f; color = android.graphics.Color.rgb(17, 19, 24) }
+        val rulePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; strokeWidth = 0.75f; color = android.graphics.Color.rgb(130, 134, 142)
         }
-        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 28f; isFakeBoldText = true }
-        val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 15f }
-        var pageNumber = 1
-        var index = 0
-        while (index < lines.size) {
-            val page = pdf.startPage(PdfDocument.PageInfo.Builder(612, 792, pageNumber++).create())
-            var y = 64f
-            while (index < lines.size && y < 744f) {
-                val line = lines[index]
-                val paint = if (index == 0) titlePaint else bodyPaint
-                wrap(line, if (index == 0) 38 else 72).forEach { segment ->
-                    if (y < 744f) page.canvas.drawText(segment, 48f, y, paint)
-                    y += if (index == 0) 38f else 23f
+        layout.pages.forEach { laidOutPage ->
+            val setup = laidOutPage.setup
+            val page = pdf.startPage(PdfDocument.PageInfo.Builder(setup.widthPoints.toInt(), setup.heightPoints.toInt(), laidOutPage.index + 1).create())
+            val fragments = laidOutPage.header + laidOutPage.columns.flatMap { it.fragments } + laidOutPage.footer
+            fragments.forEach { fragment ->
+                when (fragment.kind) {
+                    FragmentKind.Paragraph, FragmentKind.Header, FragmentKind.Footer -> fragment.lines.forEach { line ->
+                        page.canvas.drawText(line.text, line.bounds.left, line.bounds.bottom - 2f, textPaint)
+                    }
+                    FragmentKind.Table -> page.canvas.drawRect(RectF(fragment.bounds.left, fragment.bounds.top, fragment.bounds.right, fragment.bounds.bottom), rulePaint)
+                    FragmentKind.Image -> {
+                        page.canvas.drawRect(RectF(fragment.bounds.left, fragment.bounds.top, fragment.bounds.right, fragment.bounds.bottom), rulePaint)
+                        page.canvas.drawText("Image", fragment.bounds.left + 8f, fragment.bounds.top + 18f, textPaint)
+                    }
                 }
-                index += 1
             }
             pdf.finishPage(page)
         }
@@ -90,16 +98,4 @@ object AndroidDocumentActions {
         (context.getSystemService(Context.PRINT_SERVICE) as PrintManager).print(title, adapter, null)
     }
 
-    private fun wrap(value: String, width: Int): List<String> {
-        if (value.length <= width) return listOf(value)
-        val lines = mutableListOf<String>()
-        var remaining = value
-        while (remaining.length > width) {
-            val breakAt = remaining.lastIndexOf(' ', width).takeIf { it > 0 } ?: width
-            lines += remaining.substring(0, breakAt)
-            remaining = remaining.substring(breakAt).trimStart()
-        }
-        lines += remaining
-        return lines
-    }
 }

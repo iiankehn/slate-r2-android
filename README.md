@@ -14,9 +14,12 @@ The current foundation includes:
 - native Kotlin and Jetpack Compose targeting Android 12 and newer;
 - an independent R2 start center and responsive word-processing workspace;
 - a keyboard-safe command ribbon, page canvas, ruler, navigation pane, format inspector, and document status bar;
-- local persistence, recovery, and file interchange infrastructure carried forward without the R1 user interface;
+- Room v3 persistence with versioned R2 payloads, automatic legacy-row promotion, and bounded recovery checkpoints;
 - a device-independent paginated document model with sections, page setup, margins, columns, paragraphs, text runs, lists, tables, and images;
 - an immutable editing engine with logical document positions, multi-paragraph selections, formatting commands, and transactional undo/redo;
+- IME-safe text-diff routing, real page-break/list/page-setup commands, and Ctrl+B/I/U/Z/Y shortcuts;
+- deterministic pagination shared by page counts, PDF, and Android printing;
+- structured DOCX export for styled runs, tables, sections, page setup, and columns;
 - deterministic workspace profiles for phone, tablet, foldable, and Googlebook Android layouts;
 - explicit touch, stylus, mouse/trackpad, and hardware-keyboard capability modeling;
 - architecture-neutral Kotlin code suitable for ARM64 and x86_64 devices;
@@ -43,11 +46,11 @@ The project uses JDK 17, Gradle 8.13, Android Gradle Plugin 8.13.2, Kotlin 2.3.1
 gradle --no-daemon testDebugUnitTest lintDebug assembleDebug
 ```
 
-GitHub Actions runs the same verification for every push and pull request.
+GitHub Actions runs the same verification for every push and pull request and checks that any packaged native library supplies both ARM64 and x86_64 variants.
 
 ## Supported architecture
 
-R2 currently contains no native ABI-specific libraries, so the Kotlin/Compose application is portable across ARM64 and x86_64 Android runtimes. Any future native dependency must support both targets before it can be merged.
+R2's application code is ABI-neutral. CI inspects the built APK and requires every packaged native dependency to include both ARM64 and x86_64 variants.
 
 ## Privacy baseline
 

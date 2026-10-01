@@ -12,4 +12,5 @@ data class Document(
     val folder: String = "",
     val tags: Set<String> = emptySet(),
     val updatedAtEpochMillis: Long = System.currentTimeMillis(),
+    val wordProcessingDocument: WordProcessingDocument? = null,
 )

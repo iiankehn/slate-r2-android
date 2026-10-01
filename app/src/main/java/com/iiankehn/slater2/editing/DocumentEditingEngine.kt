@@ -4,6 +4,9 @@ import com.iiankehn.slater2.model.CharacterStyle
 import com.iiankehn.slater2.model.DocumentBlock
 import com.iiankehn.slater2.model.DocumentSection
 import com.iiankehn.slater2.model.NamedParagraphStyle
+import com.iiankehn.slater2.model.ListKind
+import com.iiankehn.slater2.model.ListStyle
+import com.iiankehn.slater2.model.PageSetup
 import com.iiankehn.slater2.model.ParagraphBlock
 import com.iiankehn.slater2.model.ParagraphStyle
 import com.iiankehn.slater2.model.TextRun
@@ -47,6 +50,9 @@ sealed interface DocumentCommand {
     data class ApplyCharacterStyle(val style: CharacterStyle) : DocumentCommand
     data class ApplyParagraphStyle(val style: ParagraphStyle) : DocumentCommand
     data class ApplyNamedStyle(val style: NamedParagraphStyle) : DocumentCommand
+    data class ToggleList(val kind: ListKind) : DocumentCommand
+    data class UpdatePageSetup(val page: PageSetup) : DocumentCommand
+    data object InsertPageBreak : DocumentCommand
 }
 
 data class EditorSnapshot(
@@ -81,8 +87,24 @@ class DocumentEditingEngine(
             is DocumentCommand.ApplyNamedStyle -> applyParagraphStyle(snapshot) {
                 it.copy(namedStyle = command.style)
             }
+            is DocumentCommand.ToggleList -> applyParagraphStyle(snapshot) {
+                it.copy(list = if (it.list?.kind == command.kind) null else ListStyle(command.kind, it.list?.level ?: 0))
+            }
+            is DocumentCommand.UpdatePageSetup -> updatePageSetup(snapshot, command.page)
+            DocumentCommand.InsertPageBreak -> insertPageBreak(snapshot)
         }
         return EditResult(updated, updated != snapshot)
+    }
+
+    private fun updatePageSetup(snapshot: EditorSnapshot, page: PageSetup): EditorSnapshot {
+        val sectionIndex = snapshot.selection.focus.sectionIndex
+        val sections = snapshot.document.sections.mapIndexed { index, section -> if (index == sectionIndex) section.copy(page = page) else section }
+        return snapshot.copy(document = snapshot.document.copy(sections = sections).touch())
+    }
+
+    private fun insertPageBreak(snapshot: EditorSnapshot): EditorSnapshot {
+        val inserted = replaceSelection(snapshot, "\n")
+        return applyParagraphStyle(inserted) { it.copy(pageBreakBefore = true) }
     }
 
     private fun replaceSelection(snapshot: EditorSnapshot, insertedText: String): EditorSnapshot {

@@ -1,8 +1,6 @@
 package com.iiankehn.slater2.io
 
-import com.iiankehn.slater2.model.RichTextDocument
-import com.iiankehn.slater2.model.RichTextRange
-import com.iiankehn.slater2.model.RichTextStyle
+import com.iiankehn.slater2.model.*
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.util.zip.ZipEntry
@@ -131,6 +129,58 @@ object DocumentFormats {
             zip.closeEntry()
         }
         return output.toByteArray()
+    }
+
+    fun exportDocx(document: WordProcessingDocument): ByteArray {
+        val output = ByteArrayOutputStream()
+        ZipOutputStream(output).use { zip ->
+            zip.putNextEntry(ZipEntry("[Content_Types].xml"))
+            zip.write("""<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>""".toByteArray())
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("_rels/.rels"))
+            zip.write("""<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>""".toByteArray())
+            zip.closeEntry()
+            zip.putNextEntry(ZipEntry("word/document.xml"))
+            val body = document.sections.mapIndexed { index, section ->
+                section.blocks.joinToString("") { it.toWordXml() } + section.toSectionXml(index < document.sections.lastIndex)
+            }.joinToString("")
+            zip.write("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>$body</w:body></w:document>""".toByteArray())
+            zip.closeEntry()
+        }
+        return output.toByteArray()
+    }
+
+    private fun DocumentBlock.toWordXml(): String = when (this) {
+        is ParagraphBlock -> {
+            val paragraphProperties = buildString {
+                append("<w:pPr>")
+                if (style.namedStyle != NamedParagraphStyle.Normal) append("<w:pStyle w:val=\"").append(style.namedStyle.name).append("\"/>")
+                append("<w:jc w:val=\"").append(when (style.alignment) { ParagraphAlignment.Start -> "left"; ParagraphAlignment.Center -> "center"; ParagraphAlignment.End -> "right"; ParagraphAlignment.Justify -> "both" }).append("\"/>")
+                append("<w:spacing w:before=\"").append((style.spaceBeforePoints * 20).toInt()).append("\" w:after=\"").append((style.spaceAfterPoints * 20).toInt()).append("\"/>")
+                if (style.pageBreakBefore) append("<w:pageBreakBefore/>")
+                append("</w:pPr>")
+            }
+            "<w:p>$paragraphProperties${runs.joinToString("") { it.toWordXml() }}</w:p>"
+        }
+        is TableBlock -> "<w:tbl>${rows.joinToString("") { row -> "<w:tr>${row.cells.joinToString("") { cell -> "<w:tc>${cell.blocks.joinToString("") { it.toWordXml() }}</w:tc>" }}</w:tr>" }}</w:tbl>"
+        is ImageBlock -> "<w:p><w:r><w:t xml:space=\"preserve\">${encodeXml(if (description.isBlank()) "[Image]" else "[Image: $description]")}</w:t></w:r></w:p>"
+    }
+
+    private fun TextRun.toWordXml(): String {
+        val properties = buildString {
+            append("<w:rPr><w:rFonts w:ascii=\"").append(encodeXml(style.fontFamily)).append("\"/>")
+            append("<w:sz w:val=\"").append((style.fontSizePoints * 2).toInt()).append("\"/>")
+            if (style.bold) append("<w:b/>"); if (style.italic) append("<w:i/>")
+            if (style.underline) append("<w:u w:val=\"single\"/>"); if (style.strikeThrough) append("<w:strike/>")
+            append("</w:rPr>")
+        }
+        return "<w:r>$properties<w:t xml:space=\"preserve\">${encodeXml(text)}</w:t></w:r>"
+    }
+
+    private fun DocumentSection.toSectionXml(nextPage: Boolean): String {
+        val width = page.widthPoints.times(20).toInt(); val height = page.heightPoints.times(20).toInt()
+        val margins = page.margins
+        return "<w:sectPr>${if (nextPage || startsOnNewPage) "<w:type w:val=\"nextPage\"/>" else ""}<w:pgSz w:w=\"$width\" w:h=\"$height\"/><w:pgMar w:top=\"${(margins.topPoints * 20).toInt()}\" w:right=\"${(margins.endPoints * 20).toInt()}\" w:bottom=\"${(margins.bottomPoints * 20).toInt()}\" w:left=\"${(margins.startPoints * 20).toInt()}\"/><w:cols w:num=\"${page.columns}\" w:space=\"${(page.columnSpacingPoints * 20).toInt()}\"/></w:sectPr>"
     }
 
     private fun wrap(text: StringBuilder, range: RichTextRange, before: String, after: String) {

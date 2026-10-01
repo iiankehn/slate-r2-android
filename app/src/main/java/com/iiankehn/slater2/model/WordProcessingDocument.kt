@@ -35,6 +35,8 @@ data class DocumentMetadata(
 data class DocumentSection(
     val page: PageSetup = PageSetup(),
     val blocks: List<DocumentBlock> = listOf(ParagraphBlock()),
+    val header: List<ParagraphBlock> = emptyList(),
+    val footer: List<ParagraphBlock> = emptyList(),
     val startsOnNewPage: Boolean = false,
 ) {
     init {
@@ -47,9 +49,14 @@ data class PageSetup(
     val orientation: PageOrientation = PageOrientation.Portrait,
     val margins: PageMargins = PageMargins(),
     val columns: Int = 1,
+    val columnSpacingPoints: Float = 18f,
 ) {
     init {
         require(columns in 1..4) { "Slate R2 supports between one and four text columns." }
+        require(columnSpacingPoints >= 0f) { "Column spacing cannot be negative." }
+        require(widthPoints > margins.startPoints + margins.endPoints) { "Horizontal margins must leave printable space." }
+        require(heightPoints > margins.topPoints + margins.bottomPoints) { "Vertical margins must leave printable space." }
+        require(columnWidthPoints > 0f) { "Columns and spacing must leave printable space." }
     }
 
     val widthPoints: Float
@@ -63,6 +70,9 @@ data class PageSetup(
 
     val contentHeightPoints: Float
         get() = heightPoints - margins.topPoints - margins.bottomPoints
+
+    val columnWidthPoints: Float
+        get() = (contentWidthPoints - columnSpacingPoints * (columns - 1)) / columns
 }
 
 enum class PageSize(val widthPoints: Float, val heightPoints: Float) {

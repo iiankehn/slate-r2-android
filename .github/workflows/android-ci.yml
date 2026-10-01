@@ -24,6 +24,14 @@ jobs:
           gradle-version: "8.13"
       - name: Verify debug build
         run: gradle --no-daemon testDebugUnitTest lintDebug assembleDebug
+      - name: Verify target architectures
+        run: |
+          apk=app/build/outputs/apk/debug/app-debug.apk
+          native_entries=$(unzip -Z1 "$apk" | grep '^lib/.*/.*\.so$' || true)
+          if [ -n "$native_entries" ]; then
+            printf '%s\n' "$native_entries" | grep -q '^lib/arm64-v8a/'
+            printf '%s\n' "$native_entries" | grep -q '^lib/x86_64/'
+          fi
       - name: Upload APK
         uses: actions/upload-artifact@v5
         with:
