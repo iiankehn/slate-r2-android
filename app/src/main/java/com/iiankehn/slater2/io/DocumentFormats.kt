@@ -11,6 +11,7 @@ data class ImportedDocument(
     val title: String,
     val body: RichTextDocument,
     val warnings: List<String> = emptyList(),
+    val wordProcessingDocument: WordProcessingDocument? = null,
 )
 
 object DocumentFormats {
@@ -84,6 +85,7 @@ object DocumentFormats {
     fun importDocx(bytes: ByteArray, fallbackTitle: String): ImportedDocument {
         require(bytes.size <= MAX_DOCUMENT_BYTES) { "Document is larger than 25 MB." }
         var documentXml: ByteArray? = null
+        var relationshipsXml: ByteArray? = null
         var entries = 0
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
             while (true) {
@@ -92,23 +94,21 @@ object DocumentFormats {
                 require(entries <= MAX_DOCX_ENTRIES) { "DOCX contains too many entries." }
                 if (entry.name == "word/document.xml") {
                     documentXml = zip.readLimited(MAX_XML_BYTES)
+                } else if (entry.name == "word/_rels/document.xml.rels") {
+                    relationshipsXml = zip.readLimited(MAX_XML_BYTES)
                 }
             }
         }
-        val xml = requireNotNull(documentXml) { "DOCX is missing word/document.xml." }.toString(Charsets.UTF_8)
-        val paragraphs = Regex("<w:p(?:\\s[^>]*)?>(.*?)</w:p>", setOf(RegexOption.DOT_MATCHES_ALL))
-            .findAll(xml)
-            .map { paragraph ->
-                Regex("<w:t(?:\\s[^>]*)?>(.*?)</w:t>", setOf(RegexOption.DOT_MATCHES_ALL))
-                    .findAll(paragraph.groupValues[1])
-                    .joinToString("") { decodeXml(it.groupValues[1]) }
-            }
-            .toList()
-        require(paragraphs.isNotEmpty()) { "DOCX does not contain readable paragraphs." }
+        val parsed = DocxImporter.parse(
+            requireNotNull(documentXml) { "DOCX is missing word/document.xml." },
+            relationshipsXml,
+            fallbackTitle,
+        )
         return ImportedDocument(
-            title = paragraphs.firstOrNull(String::isNotBlank) ?: fallbackTitle,
-            body = RichTextDocument.plain(paragraphs.joinToString("\n")),
-            warnings = listOf("Advanced Word page layout may be simplified."),
+            title = parsed.document.title,
+            body = R2DocumentBridge.toLegacyBody(parsed.document),
+            warnings = parsed.warnings,
+            wordProcessingDocument = parsed.document,
         )
     }
 
@@ -206,7 +206,4 @@ object DocumentFormats {
         .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         .replace("\"", "&quot;").replace("'", "&apos;")
 
-    private fun decodeXml(value: String): String = value
-        .replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
-        .replace("&apos;", "'").replace("&amp;", "&")
 }

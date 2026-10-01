@@ -11,6 +11,9 @@ Slate R2 is in active foundation development and has not published an official r
 - Added deterministic pagination and shared page geometry for status, PDF, and Android printing.
 - Added Room schema v3 with a bounded versioned R2 payload, recovery copies, corruption fallback, and automatic migration of existing rows.
 - Expanded DOCX export to retain styled runs, tables, section dimensions, orientation, margins, and columns.
+- Replaced text-only DOCX parsing with a bounded structural importer for runs, paragraph styles, tables, links, margins, orientation, columns, and page breaks.
+- Added real table blocks and document-provider image insertion instead of inserting placeholder text.
+- Added deterministic page thumbnails, page-aware canvas proportions, and live object counts in the inspector.
 - Added text, Markdown, and basic DOCX import; text, Markdown, DOCX, and PDF export; share and print flows.
 - Added adaptive phone, tablet, foldable, and Googlebook workspace policies plus keyboard shortcuts.
 - Added CI checks for unit tests, lint, APK assembly, and ARM64/x86_64 native dependency coverage.

@@ -27,6 +27,8 @@ R2 uses capability milestones rather than treating its name as a sequence after 
 - [x] Deterministic line breaking, pagination, columns, headers, and footers
 - [x] Zoom, ruler, outline/navigation surfaces, and computed page counts
 - [x] Tables and inline image measurement
+- [x] Page thumbnails and page-size-aware canvas proportions
+- [x] Structured table and document-provider image insertion
 - [x] Shared pagination geometry for status, PDF, and print
 - Multi-page editable canvas, thumbnails, floating-object wrapping, and section-continuation rules
 
@@ -36,7 +38,8 @@ R2 uses capability milestones rather than treating its name as a sequence after 
 - [x] DOCX export for styled runs, tables, sections, page setup, and columns
 - [x] Deterministic PDF and printing from the layout engine
 - [x] Markdown and plain-text boundary adapters
-- Rich DOCX import, embedded image relationships, headers/footers, and round-trip fidelity fixtures
+- [x] Structural DOCX import for styled runs, tables, links, and page setup
+- Embedded image relationships, numbering definitions, headers/footers, and broader fidelity fixtures
 
 ## Release readiness
 

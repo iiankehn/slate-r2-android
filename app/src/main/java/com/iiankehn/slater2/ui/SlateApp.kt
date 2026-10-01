@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -45,6 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -92,6 +94,9 @@ import com.iiankehn.slater2.model.ListKind
 import com.iiankehn.slater2.model.PageMargins
 import com.iiankehn.slater2.model.PageOrientation
 import com.iiankehn.slater2.model.PageSize
+import com.iiankehn.slater2.model.TableBlock
+import com.iiankehn.slater2.model.ImageBlock
+import com.iiankehn.slater2.model.WordProcessingDocument
 import com.iiankehn.slater2.ui.theme.CanvasBackground
 import com.iiankehn.slater2.ui.theme.CoreBlue
 import com.iiankehn.slater2.ui.theme.Paper
@@ -123,6 +128,7 @@ fun SlateR2App(viewModel: SlateViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     var selectedId by remember { mutableStateOf<String?>(null) }
     var pendingExport by remember { mutableStateOf<ExportRequest?>(null) }
+    var pendingImageUri by remember { mutableStateOf<String?>(null) }
     val selected = uiState.documents.firstOrNull { it.id == selectedId }
 
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -167,6 +173,12 @@ fun SlateR2App(viewModel: SlateViewModel) {
                 .onFailure { Toast.makeText(context, it.message ?: "Export failed", Toast.LENGTH_LONG).show() }
         }
     }
+    val imageLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            pendingImageUri = uri.toString()
+        }
+    }
 
     fun export(document: Document, format: ExportFormat) {
         pendingExport = ExportRequest(document, format)
@@ -202,6 +214,9 @@ fun SlateR2App(viewModel: SlateViewModel) {
                 onChange = viewModel::updateDocument,
                 onNew = ::createBlank,
                 onImport = { importLauncher.launch(arrayOf("text/plain", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
+                pendingImageUri = pendingImageUri,
+                onChooseImage = { imageLauncher.launch(arrayOf("image/*")) },
+                onImageConsumed = { pendingImageUri = null },
                 onExport = { export(selected, it) },
                 onShare = { AndroidDocumentActions.share(context, selected) },
                 onPrint = { AndroidDocumentActions.print(context, selected) },
@@ -314,6 +329,9 @@ private fun WordProcessorWorkspace(
     onChange: (Document) -> Unit,
     onNew: () -> Unit,
     onImport: () -> Unit,
+    pendingImageUri: String?,
+    onChooseImage: () -> Unit,
+    onImageConsumed: () -> Unit,
     onExport: (ExportFormat) -> Unit,
     onShare: () -> Unit,
     onPrint: () -> Unit,
@@ -364,6 +382,12 @@ private fun WordProcessorWorkspace(
         }
         publish(editor.updatePageSetup(updated))
     }
+    LaunchedEffect(pendingImageUri) {
+        pendingImageUri?.let { uri ->
+            publish(editor.insertImage(editorValue.selection.min, editorValue.selection.max, uri, "Imported picture"))
+            onImageConsumed()
+        }
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).imePadding()) {
         val tablet = maxWidth >= 840.dp
@@ -376,6 +400,8 @@ private fun WordProcessorWorkspace(
                 onToggle = ::toggle, onInsert = ::insert, onNew = onNew, onOpen = onImport,
                 onToggleList = ::toggleList,
                 onPageBreak = { publish(editor.insertPageBreak(editorValue.selection.min, editorValue.selection.max)) },
+                onInsertTable = { publish(editor.insertTable(editorValue.selection.min, editorValue.selection.max)) },
+                onInsertImage = onChooseImage,
                 onLayout = ::updateLayout,
                 onExport = onExport, onShare = onShare, onPrint = onPrint, onCheckUpdates = onCheckUpdates,
                 showNavigation = showNavigation, showInspector = showInspector,
@@ -389,6 +415,7 @@ private fun WordProcessorWorkspace(
                     Ruler(zoom)
                     DocumentCanvas(
                         value = editorValue, zoom = zoom, focusRequester = focusRequester,
+                        document = editor.document,
                         onValueChange = { value ->
                             publish(editor.replace(value.text, value.selection.start, value.selection.end))
                         },
@@ -447,6 +474,8 @@ private fun Ribbon(
     onInsert: (String) -> Unit,
     onToggleList: (ListKind) -> Unit,
     onPageBreak: () -> Unit,
+    onInsertTable: () -> Unit,
+    onInsertImage: () -> Unit,
     onLayout: (LayoutAction) -> Unit,
     onNew: () -> Unit,
     onOpen: () -> Unit,
@@ -479,7 +508,7 @@ private fun Ribbon(
                 }
                 RibbonTab.Insert -> {
                     RibbonGroup("Pages") { RibbonCommand("Page break", onPageBreak) }
-                    RibbonGroup("Content") { RibbonCommand("Table", { onInsert("\n| Column | Column |\n| — | — |\n|  |  |\n") }); RibbonCommand("Picture", { onInsert("[Image]\n") }); RibbonCommand("Link", { onToggle(RichTextStyle.Link) }) }
+                    RibbonGroup("Content") { RibbonCommand("Table", onInsertTable); RibbonCommand("Picture", onInsertImage); RibbonCommand("Link", { onToggle(RichTextStyle.Link) }) }
                 }
                 RibbonTab.Layout -> RibbonGroup("Page setup") { RibbonCommand("Margins", { onLayout(LayoutAction.Margins) }); RibbonCommand("Orientation", { onLayout(LayoutAction.Orientation) }); RibbonCommand("Size", { onLayout(LayoutAction.Size) }); RibbonCommand("Columns", { onLayout(LayoutAction.Columns) }) }
                 RibbonTab.Review -> {
@@ -524,25 +553,44 @@ private fun ExportMenu(onExport: (ExportFormat) -> Unit) {
 
 @Composable
 private fun NavigationPane(document: Document, modifier: Modifier = Modifier) {
+    val r2 = document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)
+    val layout = remember(r2) { DocumentLayoutEngine().layout(r2) }
     Surface(modifier, color = MaterialTheme.colorScheme.surface) {
-        Column(Modifier.padding(16.dp)) {
+        Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
             Text("Navigation", style = MaterialTheme.typography.titleMedium)
             Text("HEADINGS", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 20.dp, bottom = 8.dp))
             val headings = document.body.text.lines().filter { it.isNotBlank() }.take(8)
             if (headings.isEmpty()) Text("Add headings to build an outline.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             headings.forEachIndexed { index, line -> Text(line, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp), fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal) }
+            Text("PAGES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 22.dp, bottom = 8.dp))
+            layout.pages.take(20).forEach { page ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Surface(Modifier.width(42.dp).aspectRatio(page.setup.widthPoints / page.setup.heightPoints), color = Paper, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 1.dp) {}
+                    Text("Page ${page.index + 1}", modifier = Modifier.padding(start = 10.dp), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun InspectorPane(document: Document, modifier: Modifier = Modifier) {
+    val r2 = document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)
+    val page = r2.sections.first().page
+    val blocks = r2.sections.flatMap { it.blocks }
     Surface(modifier, color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text("Format", style = MaterialTheme.typography.titleMedium)
             InspectorSection("Text", listOf("Typeface" to "Serif", "Size" to "11 pt", "Color" to "Automatic"))
             InspectorSection("Paragraph", listOf("Alignment" to "Left", "Line spacing" to "1.15", "After" to "8 pt"))
-            InspectorSection("Document", listOf("Page" to "A4", "Margins" to "Normal", "Words" to wordCount(document.body.text).toString()))
+            InspectorSection("Document", listOf(
+                "Page" to page.size.name,
+                "Orientation" to page.orientation.name,
+                "Columns" to page.columns.toString(),
+                "Tables" to blocks.count { it is TableBlock }.toString(),
+                "Pictures" to blocks.count { it is ImageBlock }.toString(),
+                "Words" to wordCount(document.body.text).toString(),
+            ))
         }
     }
 }
@@ -565,18 +613,21 @@ private fun Ruler(zoom: Int) {
 }
 
 @Composable
-private fun DocumentCanvas(value: TextFieldValue, zoom: Int, focusRequester: FocusRequester, onValueChange: (TextFieldValue) -> Unit, onToggle: (RichTextStyle) -> Unit, onUndo: () -> Unit, onRedo: () -> Unit) {
+private fun DocumentCanvas(value: TextFieldValue, document: WordProcessingDocument, zoom: Int, focusRequester: FocusRequester, onValueChange: (TextFieldValue) -> Unit, onToggle: (RichTextStyle) -> Unit, onUndo: () -> Unit, onRedo: () -> Unit) {
+    val page = document.sections.first().page
     Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 28.dp), contentAlignment = Alignment.TopCenter) {
         Surface(
-            modifier = Modifier.widthIn(max = (760 * zoom / 100).dp).fillMaxWidth(),
+            modifier = Modifier.widthIn(max = (760 * zoom / 100).dp).fillMaxWidth().aspectRatio(page.widthPoints / page.heightPoints),
             color = Paper, contentColor = PaperText, shape = RoundedCornerShape(3.dp), shadowElevation = 4.dp,
         ) {
-            BasicTextField(
+            Column {
+                StructuredObjects(document)
+                BasicTextField(
                 value = value,
                 onValueChange = onValueChange,
                 textStyle = TextStyle(color = PaperText, fontSize = (17 * zoom / 100f).sp, lineHeight = (28 * zoom / 100f).sp, fontFamily = FontFamily.Serif),
                 cursorBrush = SolidColor(CoreBlue),
-                modifier = Modifier.fillMaxWidth().height((980 * zoom / 100).dp)
+                modifier = Modifier.fillMaxSize()
                     .padding(horizontal = (72 * zoom / 100).dp, vertical = (70 * zoom / 100).dp)
                     .focusRequester(focusRequester)
                     .onPreviewKeyEvent { event ->
@@ -594,7 +645,26 @@ private fun DocumentCanvas(value: TextFieldValue, zoom: Int, focusRequester: Foc
                     if (value.text.isEmpty()) Text("Start writing…", color = PaperText.copy(alpha = 0.42f), fontFamily = FontFamily.Serif, fontSize = 17.sp)
                     inner()
                 },
-            )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StructuredObjects(document: WordProcessingDocument) {
+    val objects = document.sections.flatMap { it.blocks }.filter { it is TableBlock || it is ImageBlock }
+    if (objects.isEmpty()) return
+    Column(Modifier.fillMaxWidth().padding(horizontal = 72.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        objects.forEach { block ->
+            Surface(color = Color(0xFFF0F4FA), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Color(0xFFCAD3DF))) {
+                val label = when (block) {
+                    is TableBlock -> "Table · ${block.rows.size} × ${block.rows.first().cells.size}"
+                    is ImageBlock -> "Picture · ${block.description.ifBlank { "No description" }}"
+                    else -> "Object"
+                }
+                Text(label, modifier = Modifier.fillMaxWidth().padding(12.dp), color = PaperText, fontWeight = FontWeight.Medium)
+            }
         }
     }
 }

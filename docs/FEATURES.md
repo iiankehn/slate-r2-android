@@ -12,10 +12,10 @@ Status values describe the development tree, not a public release.
 | Paragraphs and character runs | IME diffs route through the R2 engine | Tabs, language runs, and advanced typography |
 | Named styles | Heading, quote, and normal command application | Style gallery, inheritance, document themes |
 | Lists | Bulleted and numbered list commands | Visible markers, multilevel lists, checklists |
-| Tables | Validated model implemented | Resize, merge, repeat headers, keyboard navigation |
-| Images | Model implemented | Resize, crop, wrapping, positioning, accessibility text |
+| Tables | Structured 2×2 insertion, model validation, DOCX import/export, layout measurement | Cell editing, resize, merge, repeat headers, keyboard navigation |
+| Images | Android document-provider insertion, durable URI permission, layout objects | Inline rendering, resize, crop, wrapping, positioning, accessibility text |
 | Pagination | Deterministic pages, columns, headers/footers, tables, and inline images | Editable multi-page canvas and floating objects |
-| DOCX | Styled runs, tables, page setup, columns, and section export; basic text import | Relationships, embedded media, headers/footers, fidelity fixtures |
+| DOCX | Structural paragraphs/runs/styles/tables/page setup/columns/link import and structured export | Embedded media, numbering definitions, headers/footers, fidelity fixtures |
 | PDF and printing | Shared deterministic layout geometry | Font embedding and image rasterization |
 | Ribbon and page workspace | Independent R2 surface implemented | Connect every advanced command to the editing engine |
 | Phone workspace | Compact persistent ribbon and fit-width page | Complete compact word-processing workflow |
@@ -25,7 +25,7 @@ Status values describe the development tree, not a public release.
 
 ## Current limitations
 
-The current canvas is a single editable page surface even when the layout engine reports multiple pages. Table and image blocks are measured and exported but do not yet have direct-manipulation editors. DOCX import extracts readable paragraphs but does not preserve full OOXML styling. These are release blockers, not hidden compatibility claims.
+The current canvas is a single editable page surface even when the layout engine reports multiple pages; the navigation pane now exposes deterministic page thumbnails. Tables and images can be inserted and are represented as structured objects, but do not yet have direct-manipulation editors. DOCX import preserves the supported structural subset but embedded media, numbering definitions, and headers/footers still require fidelity work. These are release blockers, not hidden compatibility claims.
 
 ## Input contract
 

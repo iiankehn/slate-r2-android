@@ -7,6 +7,8 @@ import com.iiankehn.slater2.model.WordProcessingDocument
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.iiankehn.slater2.model.TableBlock
+import com.iiankehn.slater2.model.ImageBlock
 
 class FlatTextEditorAdapterTest {
     @Test fun `ime replacement becomes an undoable R2 transaction`() {
@@ -23,6 +25,16 @@ class FlatTextEditorAdapterTest {
         adapter.replace("One\nTwo", 7, 7)
         assertEquals(2, adapter.document.sections.single().blocks.size)
         assertEquals("One\nTwo", adapter.state().text)
+    }
+
+    @Test fun `structured blocks are inserted into the R2 model and undoable`() {
+        val adapter = FlatTextEditorAdapter(document("One"))
+        adapter.insertTable(3, 3)
+        assertTrue(adapter.document.sections.single().blocks.any { it is TableBlock })
+        adapter.insertImage(4, 4, "content://picture", "Chart")
+        assertTrue(adapter.document.sections.single().blocks.any { it is ImageBlock })
+        adapter.undo()
+        assertTrue(adapter.document.sections.single().blocks.none { it is ImageBlock })
     }
 
     private fun document(text: String) = WordProcessingDocument(

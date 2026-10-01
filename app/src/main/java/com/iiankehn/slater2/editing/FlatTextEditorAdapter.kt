@@ -67,6 +67,18 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
         return state()
     }
 
+    fun insertTable(start: Int, end: Int, rows: Int = 2, columns: Int = 2): FlatEditorState {
+        session.updateSelection(DocumentSelection(index.position(start), index.position(end)))
+        session.execute(DocumentCommand.InsertTable(rows, columns))
+        return state()
+    }
+
+    fun insertImage(start: Int, end: Int, sourceUri: String, description: String = ""): FlatEditorState {
+        session.updateSelection(DocumentSelection(index.position(start), index.position(end)))
+        session.execute(DocumentCommand.InsertImage(sourceUri, description))
+        return state()
+    }
+
     fun undo(): FlatEditorState { session.undo(); return state() }
     fun redo(): FlatEditorState { session.redo(); return state() }
 

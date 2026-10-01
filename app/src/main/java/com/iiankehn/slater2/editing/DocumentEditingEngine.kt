@@ -7,6 +7,10 @@ import com.iiankehn.slater2.model.NamedParagraphStyle
 import com.iiankehn.slater2.model.ListKind
 import com.iiankehn.slater2.model.ListStyle
 import com.iiankehn.slater2.model.PageSetup
+import com.iiankehn.slater2.model.TableBlock
+import com.iiankehn.slater2.model.TableCell
+import com.iiankehn.slater2.model.TableRow
+import com.iiankehn.slater2.model.ImageBlock
 import com.iiankehn.slater2.model.ParagraphBlock
 import com.iiankehn.slater2.model.ParagraphStyle
 import com.iiankehn.slater2.model.TextRun
@@ -53,6 +57,8 @@ sealed interface DocumentCommand {
     data class ToggleList(val kind: ListKind) : DocumentCommand
     data class UpdatePageSetup(val page: PageSetup) : DocumentCommand
     data object InsertPageBreak : DocumentCommand
+    data class InsertTable(val rows: Int = 2, val columns: Int = 2) : DocumentCommand
+    data class InsertImage(val sourceUri: String, val description: String = "") : DocumentCommand
 }
 
 data class EditorSnapshot(
@@ -92,6 +98,13 @@ class DocumentEditingEngine(
             }
             is DocumentCommand.UpdatePageSetup -> updatePageSetup(snapshot, command.page)
             DocumentCommand.InsertPageBreak -> insertPageBreak(snapshot)
+            is DocumentCommand.InsertTable -> insertBlock(snapshot, TableBlock(
+                id = "table-${UUID.randomUUID()}",
+                rows = List(command.rows.coerceIn(1, 100)) { TableRow(List(command.columns.coerceIn(1, 20)) { TableCell() }) },
+            ))
+            is DocumentCommand.InsertImage -> insertBlock(snapshot, ImageBlock(
+                id = "image-${UUID.randomUUID()}", sourceUri = command.sourceUri, description = command.description,
+            ))
         }
         return EditResult(updated, updated != snapshot)
     }
@@ -105,6 +118,21 @@ class DocumentEditingEngine(
     private fun insertPageBreak(snapshot: EditorSnapshot): EditorSnapshot {
         val inserted = replaceSelection(snapshot, "\n")
         return applyParagraphStyle(inserted) { it.copy(pageBreakBefore = true) }
+    }
+
+    private fun insertBlock(snapshot: EditorSnapshot, block: DocumentBlock): EditorSnapshot {
+        val position = snapshot.selection.focus
+        val section = snapshot.document.sections[position.sectionIndex]
+        val trailingParagraph = ParagraphBlock(id = paragraphIdFactory())
+        val insertionIndex = position.blockIndex + 1
+        val blocks = section.blocks.toMutableList().apply {
+            add(insertionIndex, block)
+            add(insertionIndex + 1, trailingParagraph)
+        }
+        return EditorSnapshot(
+            snapshot.document.replaceSection(position.sectionIndex, section.copy(blocks = blocks)),
+            DocumentSelection(DocumentPosition(position.sectionIndex, insertionIndex + 1, 0)),
+        )
     }
 
     private fun replaceSelection(snapshot: EditorSnapshot, insertedText: String): EditorSnapshot {

@@ -67,11 +67,14 @@ class SlateViewModel(
     }
 
     fun importDocument(imported: ImportedDocument): Document {
+        val id = UUID.randomUUID().toString()
+        val importedR2 = imported.wordProcessingDocument?.copy(id = id, title = imported.title)
         val document = Document(
-            id = UUID.randomUUID().toString(),
+            id = id,
             title = imported.title,
             body = imported.body,
             updatedLabel = "Imported now",
+            wordProcessingDocument = importedR2,
         ).withSynchronizedR2()
         updateLocal(document)
         scheduleSave(document, delayMillis = 0)
