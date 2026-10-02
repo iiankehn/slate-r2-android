@@ -16,11 +16,12 @@ Slate R2 is in active foundation development and has not published an official r
 - Added direct table-cell editing, row and column growth, object deletion, and undo/redo-backed object commands.
 - Added real picture previews with size, wrapping, and accessibility-description controls.
 - Added deterministic page thumbnails, page-aware canvas proportions, and live object counts in the inspector.
+- Replaced the single-page editor with stacked editable page surfaces using deterministic layout ranges, page-aware object placement, clickable thumbnails, and active-page status.
 - Added text, Markdown, and basic DOCX import; text, Markdown, DOCX, and PDF export; share and print flows.
 - Added adaptive phone, tablet, foldable, and Googlebook workspace policies plus keyboard shortcuts.
 - Added CI checks for unit tests, lint, APK assembly, and ARM64/x86_64 native dependency coverage.
 - Made the monthly workflow validate an unsigned build without failing when signing secrets are intentionally absent; publishing remains gated on all signing secrets.
 
-Known blockers before the first official build are the editable multi-page canvas, advanced table and floating-object manipulation, richer DOCX import and embedded media, accessibility/performance audits, and the device acceptance matrix.
+Known blockers before the first official build are precise page-line placement, advanced table and floating-object manipulation, richer DOCX import and embedded media, accessibility/performance audits, and the device acceptance matrix.
 
 R2 releases will use monthly tags in the form `r2-YYYY-MM`. This naming is independent of Slate R1 and does not imply an upgrade sequence between the two products.

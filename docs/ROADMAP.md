@@ -31,7 +31,8 @@ R2 uses capability milestones rather than treating its name as a sequence after 
 - [x] Structured table and document-provider image insertion
 - [x] Editable table cells, table growth, image previews, sizing, wrapping, descriptions, and object deletion
 - [x] Shared pagination geometry for status, PDF, and print
-- Multi-page editable canvas, drag handles, floating-object layout, and section-continuation rules
+- [x] Stacked editable pages, page-aware text ranges and objects, thumbnail navigation, and active-page status
+- Drag handles, floating-object layout, and section-continuation rules
 
 ## Interchange
 

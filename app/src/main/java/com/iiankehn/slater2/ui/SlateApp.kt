@@ -36,6 +36,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -57,6 +59,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,6 +95,8 @@ import com.iiankehn.slater2.io.R2DocumentBridge
 import com.iiankehn.slater2.editing.CharacterFormat
 import com.iiankehn.slater2.editing.FlatTextEditorAdapter
 import com.iiankehn.slater2.layout.DocumentLayoutEngine
+import com.iiankehn.slater2.layout.DocumentLayout
+import com.iiankehn.slater2.layout.FragmentKind
 import com.iiankehn.slater2.model.Document
 import com.iiankehn.slater2.model.DocumentTitlePolicy
 import com.iiankehn.slater2.model.RichTextDocument
@@ -101,6 +106,7 @@ import com.iiankehn.slater2.model.ListKind
 import com.iiankehn.slater2.model.PageMargins
 import com.iiankehn.slater2.model.PageOrientation
 import com.iiankehn.slater2.model.PageSize
+import com.iiankehn.slater2.model.ParagraphBlock
 import com.iiankehn.slater2.model.TableBlock
 import com.iiankehn.slater2.model.ImageBlock
 import com.iiankehn.slater2.model.ImageWrapping
@@ -111,6 +117,7 @@ import com.iiankehn.slater2.ui.theme.Paper
 import com.iiankehn.slater2.ui.theme.PaperText
 import com.iiankehn.slater2.update.SlateUpdater
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -349,6 +356,7 @@ private fun WordProcessorWorkspace(
     var showNavigation by remember { mutableStateOf(true) }
     var showInspector by remember { mutableStateOf(true) }
     var zoom by remember { mutableStateOf(100) }
+    var activePage by remember(document.id) { mutableStateOf(0) }
     val editor = remember(document.id) { FlatTextEditorAdapter(document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)) }
     var editorValue by remember(document.id) { mutableStateOf(TextFieldValue(annotatedBody(editor.legacyBody()))) }
     val focusRequester = remember { FocusRequester() }
@@ -418,7 +426,12 @@ private fun WordProcessorWorkspace(
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(Modifier.weight(1f).fillMaxWidth()) {
-                if (tablet && showNavigation) NavigationPane(document, Modifier.width(230.dp).fillMaxHeight())
+                if (tablet && showNavigation) NavigationPane(
+                    document = document,
+                    activePage = activePage,
+                    onPageSelected = { activePage = it },
+                    modifier = Modifier.width(230.dp).fillMaxHeight(),
+                )
                 Column(Modifier.weight(1f).fillMaxHeight().background(CanvasBackground)) {
                     Ruler(zoom)
                     DocumentCanvas(
@@ -436,11 +449,13 @@ private fun WordProcessorWorkspace(
                             publish(editor.updateImage(id, description, width, height, wrapping))
                         },
                         onDeleteObject = { id -> publish(editor.deleteObject(id)) },
+                        activePage = activePage,
+                        onActivePageChange = { activePage = it },
                     )
                 }
                 if (desktop && showInspector) InspectorPane(document, Modifier.width(280.dp).fillMaxHeight())
             }
-            StatusBar(document, saving, zoom) { zoom = it }
+            StatusBar(document, saving, zoom, activePage) { zoom = it }
         }
     }
 }
@@ -566,7 +581,12 @@ private fun ExportMenu(onExport: (ExportFormat) -> Unit) {
 }
 
 @Composable
-private fun NavigationPane(document: Document, modifier: Modifier = Modifier) {
+private fun NavigationPane(
+    document: Document,
+    activePage: Int,
+    onPageSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val r2 = document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)
     val layout = remember(r2) { DocumentLayoutEngine().layout(r2) }
     Surface(modifier, color = MaterialTheme.colorScheme.surface) {
@@ -577,10 +597,25 @@ private fun NavigationPane(document: Document, modifier: Modifier = Modifier) {
             if (headings.isEmpty()) Text("Add headings to build an outline.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             headings.forEachIndexed { index, line -> Text(line, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp), fontWeight = if (index == 0) FontWeight.SemiBold else FontWeight.Normal) }
             Text("PAGES", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 22.dp, bottom = 8.dp))
-            layout.pages.take(20).forEach { page ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(Modifier.width(42.dp).aspectRatio(page.setup.widthPoints / page.setup.heightPoints), color = Paper, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 1.dp) {}
-                    Text("Page ${page.index + 1}", modifier = Modifier.padding(start = 10.dp), style = MaterialTheme.typography.bodyMedium)
+            layout.pages.take(50).forEach { page ->
+                val selected = page.index == activePage
+                Row(
+                    Modifier.fillMaxWidth().clickable { onPageSelected(page.index) }.padding(vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        Modifier.width(42.dp).aspectRatio(page.setup.widthPoints / page.setup.heightPoints),
+                        color = Paper,
+                        border = BorderStroke(if (selected) 2.dp else 1.dp, if (selected) CoreBlue else MaterialTheme.colorScheme.outlineVariant),
+                        shadowElevation = 1.dp,
+                    ) {}
+                    Text(
+                        "Page ${page.index + 1}",
+                        modifier = Modifier.padding(start = 10.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    )
                 }
             }
         }
@@ -640,38 +675,108 @@ private fun DocumentCanvas(
     onResizeTable: (String, Int, Int) -> Unit,
     onUpdateImage: (String, String, Float?, Float?, ImageWrapping) -> Unit,
     onDeleteObject: (String) -> Unit,
+    activePage: Int,
+    onActivePageChange: (Int) -> Unit,
 ) {
-    val page = document.sections.first().page
-    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 28.dp), contentAlignment = Alignment.TopCenter) {
-        Surface(
-            modifier = Modifier.widthIn(max = (760 * zoom / 100).dp).fillMaxWidth().aspectRatio(page.widthPoints / page.heightPoints),
-            color = Paper, contentColor = PaperText, shape = RoundedCornerShape(3.dp), shadowElevation = 4.dp,
-        ) {
-            Column {
-                StructuredObjects(document, onUpdateTableCell, onResizeTable, onUpdateImage, onDeleteObject)
-                BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                textStyle = TextStyle(color = PaperText, fontSize = (17 * zoom / 100f).sp, lineHeight = (28 * zoom / 100f).sp, fontFamily = FontFamily.Serif),
-                cursorBrush = SolidColor(CoreBlue),
-                modifier = Modifier.fillMaxSize()
-                    .padding(horizontal = (72 * zoom / 100).dp, vertical = (70 * zoom / 100).dp)
-                    .focusRequester(focusRequester)
-                    .onPreviewKeyEvent { event ->
-                        if (event.type != KeyEventType.KeyDown || !event.isCtrlPressed) return@onPreviewKeyEvent false
-                        when (event.key) {
-                            Key.B -> { onToggle(RichTextStyle.Bold); true }
-                            Key.I -> { onToggle(RichTextStyle.Italic); true }
-                            Key.U -> { onToggle(RichTextStyle.Underline); true }
-                            Key.Z -> { onUndo(); true }
-                            Key.Y -> { onRedo(); true }
-                            else -> false
-                        }
-                    },
-                decorationBox = { inner ->
-                    if (value.text.isEmpty()) Text("Start writing…", color = PaperText.copy(alpha = 0.42f), fontFamily = FontFamily.Serif, fontSize = 17.sp)
-                    inner()
-                },
+    val layout = remember(document) { DocumentLayoutEngine().layout(document) }
+    val slices = remember(document, layout, value.text.length) { pageTextSlices(document, layout, value.text.length) }
+    val listState = rememberLazyListState()
+    LaunchedEffect(activePage, layout.pageCount) {
+        val target = activePage.coerceIn(0, layout.pages.lastIndex)
+        if (target != activePage) onActivePageChange(target)
+        if (target != listState.firstVisibleItemIndex) listState.animateScrollToItem(target)
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow { if (listState.isScrollInProgress) null else listState.firstVisibleItemIndex }
+            .collect { visiblePage -> visiblePage?.let(onActivePageChange) }
+    }
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        state = listState,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        itemsIndexed(layout.pages, key = { _, page -> "page-${page.index}" }) { pageIndex, page ->
+            val slice = slices[pageIndex]
+            val selected = pageIndex == activePage
+            val localSelection = TextRange(
+                (value.selection.start - slice.start).coerceIn(0, slice.length),
+                (value.selection.end - slice.start).coerceIn(0, slice.length),
+            )
+            val pageValue = TextFieldValue(
+                value.annotatedString.subSequence(slice.start, slice.end),
+                if (selected) localSelection else TextRange.Zero,
+            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Surface(
+                    modifier = Modifier.widthIn(max = (760 * zoom / 100).dp).fillMaxWidth()
+                        .aspectRatio(page.setup.widthPoints / page.setup.heightPoints)
+                        .clickable { onActivePageChange(pageIndex) },
+                    color = Paper,
+                    contentColor = PaperText,
+                    shape = RoundedCornerShape(3.dp),
+                    border = if (selected) BorderStroke(2.dp, CoreBlue) else null,
+                    shadowElevation = if (selected) 7.dp else 4.dp,
+                ) {
+                    Column(Modifier.fillMaxSize()) {
+                        StructuredObjects(
+                            document = document,
+                            layout = layout,
+                            pageIndex = pageIndex,
+                            onUpdateTableCell = onUpdateTableCell,
+                            onResizeTable = onResizeTable,
+                            onUpdateImage = onUpdateImage,
+                            onDeleteObject = onDeleteObject,
+                        )
+                        BasicTextField(
+                            value = pageValue,
+                            onValueChange = { changed ->
+                                val combined = value.text.replaceRange(slice.start, slice.end, changed.text)
+                                onValueChange(TextFieldValue(
+                                    combined,
+                                    TextRange(slice.start + changed.selection.start, slice.start + changed.selection.end),
+                                ))
+                                onActivePageChange(pageIndex)
+                            },
+                            textStyle = TextStyle(
+                                color = PaperText,
+                                fontSize = (17 * zoom / 100f).sp,
+                                lineHeight = (28 * zoom / 100f).sp,
+                                fontFamily = FontFamily.Serif,
+                            ),
+                            cursorBrush = SolidColor(CoreBlue),
+                            modifier = Modifier.weight(1f).fillMaxWidth()
+                                .padding(horizontal = (72 * zoom / 100).dp, vertical = (34 * zoom / 100).dp)
+                                .then(if (selected) Modifier.focusRequester(focusRequester) else Modifier)
+                                .onPreviewKeyEvent { event ->
+                                    if (event.type != KeyEventType.KeyDown || !event.isCtrlPressed) return@onPreviewKeyEvent false
+                                    when (event.key) {
+                                        Key.B -> { onToggle(RichTextStyle.Bold); true }
+                                        Key.I -> { onToggle(RichTextStyle.Italic); true }
+                                        Key.U -> { onToggle(RichTextStyle.Underline); true }
+                                        Key.Z -> { onUndo(); true }
+                                        Key.Y -> { onRedo(); true }
+                                        else -> false
+                                    }
+                                },
+                            decorationBox = { inner ->
+                                if (pageValue.text.isEmpty()) Text(
+                                    if (pageIndex == 0) "Start writing…" else "Continue writing…",
+                                    color = PaperText.copy(alpha = 0.42f),
+                                    fontFamily = FontFamily.Serif,
+                                    fontSize = 17.sp,
+                                )
+                                inner()
+                            },
+                        )
+                    }
+                }
+                Text(
+                    "${pageIndex + 1}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp),
                 )
             }
         }
@@ -681,12 +786,17 @@ private fun DocumentCanvas(
 @Composable
 private fun StructuredObjects(
     document: WordProcessingDocument,
+    layout: DocumentLayout,
+    pageIndex: Int,
     onUpdateTableCell: (String, Int, Int, String) -> Unit,
     onResizeTable: (String, Int, Int) -> Unit,
     onUpdateImage: (String, String, Float?, Float?, ImageWrapping) -> Unit,
     onDeleteObject: (String) -> Unit,
 ) {
-    val objects = document.sections.flatMap { it.blocks }.filter { it is TableBlock || it is ImageBlock }
+    val objectIds = layout.pages[pageIndex].columns.flatMap { it.fragments }
+        .filter { it.kind == FragmentKind.Table || it.kind == FragmentKind.Image }
+        .mapTo(linkedSetOf()) { it.blockId }
+    val objects = document.sections.flatMap { it.blocks }.filter { it.id in objectIds }
     if (objects.isEmpty()) return
     Column(Modifier.fillMaxWidth().padding(horizontal = 72.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         objects.forEach { block -> when (block) {
@@ -795,8 +905,54 @@ private fun EditableImage(
     }
 }
 
+internal data class PageTextSlice(val start: Int, val end: Int) {
+    init { require(start >= 0 && end >= start) }
+    val length: Int get() = end - start
+}
+
+internal fun pageTextSlices(
+    document: WordProcessingDocument,
+    layout: DocumentLayout,
+    textLength: Int,
+): List<PageTextSlice> {
+    val paragraphRanges = buildMap<String, IntRange> {
+        var cursor = 0
+        var hasParagraph = false
+        document.sections.forEach { section ->
+            section.blocks.forEach blockLoop@ { block ->
+                if (block !is ParagraphBlock) return@blockLoop
+                if (hasParagraph) cursor += 1
+                val start = cursor
+                cursor += block.runs.sumOf { it.text.length }
+                put(block.id, start..cursor)
+                hasParagraph = true
+            }
+        }
+    }
+    val rawStarts = layout.pages.map { page ->
+        page.columns.asSequence()
+            .flatMap { it.fragments.asSequence() }
+            .filter { it.kind == FragmentKind.Paragraph }
+            .mapNotNull { fragment ->
+                val range = paragraphRanges[fragment.blockId] ?: return@mapNotNull null
+                range.first + (fragment.lines.minOfOrNull { it.sourceStart } ?: 0)
+            }
+            .minOrNull()
+    }
+    val starts = MutableList(layout.pageCount) { 0 }
+    rawStarts.indices.forEach { index ->
+        val previous = starts.getOrElse(index - 1) { 0 }
+        val candidate = if (index == 0) 0 else rawStarts[index] ?: previous
+        starts[index] = candidate.coerceIn(previous, textLength)
+    }
+    return starts.mapIndexed { index, start ->
+        val end = starts.getOrNull(index + 1) ?: textLength
+        PageTextSlice(start, end.coerceIn(start, textLength))
+    }
+}
+
 @Composable
-private fun StatusBar(document: Document, saving: Boolean, zoom: Int, onZoom: (Int) -> Unit) {
+private fun StatusBar(document: Document, saving: Boolean, zoom: Int, activePage: Int, onZoom: (Int) -> Unit) {
     val words = wordCount(document.body.text)
     val pages = remember(document.wordProcessingDocument, document.body) {
         DocumentLayoutEngine().layout(document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)).pageCount
@@ -804,7 +960,7 @@ private fun StatusBar(document: Document, saving: Boolean, zoom: Int, onZoom: (I
     Surface(color = MaterialTheme.colorScheme.surface) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(if (saving) "Saving…" else "Saved locally", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("  •  Page 1 of $pages  •  $words words  •  ${document.body.text.length} characters", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("  •  Page ${(activePage + 1).coerceAtMost(pages)} of $pages  •  $words words  •  ${document.body.text.length} characters", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             TextButton(onClick = { onZoom((zoom - 25).coerceAtLeast(50)) }) { Text("−") }
             Text("$zoom%", style = MaterialTheme.typography.labelMedium)
             TextButton(onClick = { onZoom((zoom + 25).coerceAtMost(175)) }) { Text("+") }
