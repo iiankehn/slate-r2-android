@@ -5,7 +5,11 @@ import java.io.ByteArrayInputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import org.w3c.dom.Element
 
-internal data class ParsedDocx(val document: WordProcessingDocument, val warnings: List<String>)
+internal data class ParsedDocx(
+    val document: WordProcessingDocument,
+    val warnings: List<String>,
+    val embeddedImages: List<ImportedEmbeddedImage> = emptyList(),
+)
 
 /** Bounded OOXML reader for Word content that Slate can represent without executing package data. */
 internal object DocxImporter {
@@ -14,6 +18,7 @@ internal object DocxImporter {
         relationshipsXml: ByteArray?,
         fallbackTitle: String,
         marginParts: Map<String, ByteArray> = emptyMap(),
+        mediaParts: Map<String, ByteArray> = emptyMap(),
     ): ParsedDocx {
         val root = parseXml(documentXml)
         val relationships = relationshipsXml?.let { parseRelationships(it) }.orEmpty()
@@ -21,10 +26,25 @@ internal object DocxImporter {
             ?: error("DOCX is missing the Word document body.")
         var blockNumber = 0
         var containsDrawing = false
+        val importedImages = mutableListOf<ImportedEmbeddedImage>()
         val parsedBlocks = body.elements().mapNotNull { element ->
             when (element.localName) {
-                "p" -> parseParagraph(element, "paragraph-${blockNumber++}", relationships).also {
-                    if (element.descendants("drawing").isNotEmpty() || element.descendants("pict").isNotEmpty()) containsDrawing = true
+                "p" -> {
+                    val drawing = element.descendants("drawing").isNotEmpty() || element.descendants("pict").isNotEmpty()
+                    containsDrawing = containsDrawing || drawing
+                    val blip = element.descendants("blip").firstOrNull()
+                    val relationshipId = blip?.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "embed")
+                        .orEmpty().ifBlank { blip?.getAttribute("r:embed").orEmpty() }.ifBlank { null }
+                    val target = relationshipId?.let(relationships::get)
+                    val path = target?.let { if (it.startsWith("word/")) it else "word/${it.removePrefix("/")}" }
+                    val bytes = path?.let(mediaParts::get)
+                    if (bytes != null) {
+                        val id = "image-${blockNumber++}"
+                        val extension = path.substringAfterLast('.', "bin").lowercase()
+                        importedImages += ImportedEmbeddedImage(id, bytes, extension)
+                        val description = element.descendants("docPr").firstOrNull()?.getAttribute("descr").orEmpty()
+                        ImageBlock(id, "slate-import://$id", description)
+                    } else parseParagraph(element, "paragraph-${blockNumber++}", relationships)
                 }
                 "tbl" -> parseTable(element, "table-${blockNumber++}", relationships)
                 else -> null
@@ -66,14 +86,15 @@ internal object DocxImporter {
             )),
         )
         val warnings = buildList {
-            if (containsDrawing) add("Embedded drawings and pictures were detected but require placement review.")
+            if (containsDrawing && importedImages.isEmpty()) add("Embedded drawings were detected but could not be extracted.")
+            else if (importedImages.isNotEmpty()) add("Embedded pictures were imported; review their placement and wrapping.")
             if ((header.isEmpty() && relationships.values.any { it.contains("header", true) }) ||
                 (footer.isEmpty() && relationships.values.any { it.contains("footer", true) })) {
                 add("Some Word headers or footers could not be imported and require review.")
             }
             add("Review imported pagination because Word font metrics may differ from Slate.")
         }
-        return ParsedDocx(document, warnings)
+        return ParsedDocx(document, warnings, importedImages)
     }
 
     private fun parseParagraph(element: Element, id: String, relationships: Map<String, String>): ParagraphBlock {

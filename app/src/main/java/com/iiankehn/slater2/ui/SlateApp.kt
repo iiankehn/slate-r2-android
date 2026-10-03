@@ -69,7 +69,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
@@ -84,6 +86,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
@@ -135,6 +138,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 private enum class RibbonTab { File, Home, Insert, Layout, Review, View }
 private enum class LayoutAction { Margins, Orientation, Size, Columns }
@@ -171,11 +175,12 @@ fun SlateR2App(viewModel: SlateViewModel) {
                     val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                         ?: error("Unable to read the selected document.")
                     val title = name.substringBeforeLast('.').ifBlank { "Imported document" }
-                    when (name.substringAfterLast('.', "").lowercase()) {
+                    val imported = when (name.substringAfterLast('.', "").lowercase()) {
                         "md", "markdown" -> DocumentFormats.importMarkdown(bytes, title)
                         "docx" -> DocumentFormats.importDocx(bytes, title)
                         else -> DocumentFormats.importText(bytes, title)
                     }
+                    materializeImportedImages(context, imported)
                 }
             }.onSuccess { imported ->
                 selectedId = viewModel.importDocument(imported).id
@@ -279,6 +284,25 @@ fun SlateR2App(viewModel: SlateViewModel) {
             )
         }
     }
+}
+
+private fun materializeImportedImages(context: android.content.Context, imported: com.iiankehn.slater2.io.ImportedDocument): com.iiankehn.slater2.io.ImportedDocument {
+    if (imported.embeddedImages.isEmpty()) return imported
+    val directory = File(context.filesDir, "imported-docx-media").apply { mkdirs() }
+    val uris = imported.embeddedImages.associate { image ->
+        val extension = image.extension.takeIf { it.matches(Regex("[a-zA-Z0-9]{1,8}")) } ?: "bin"
+        val file = File(directory, "${image.blockId}-${image.bytes.contentHashCode()}.$extension")
+        file.outputStream().use { it.write(image.bytes) }
+        image.blockId to Uri.fromFile(file).toString()
+    }
+    val document = imported.wordProcessingDocument?.let { r2 ->
+        r2.copy(sections = r2.sections.map { section ->
+            section.copy(blocks = section.blocks.map { block ->
+                if (block is ImageBlock && block.id in uris) block.copy(sourceUri = uris.getValue(block.id)) else block
+            })
+        })
+    }
+    return imported.copy(wordProcessingDocument = document, embeddedImages = emptyList())
 }
 
 @Composable
@@ -501,9 +525,11 @@ private fun WordProcessorWorkspace(
                         onDeleteTableRow = { id, row -> publish(editor.deleteTableRow(id, row)) },
                         onDeleteTableColumn = { id, column -> publish(editor.deleteTableColumn(id, column)) },
                         onSetTableHeaderRows = { id, count -> publish(editor.setTableHeaderRows(id, count)) },
+                        onMergeTableCells = { id, row, start, end -> publish(editor.mergeTableCells(id, row, start, end)) },
                         onUpdateImage = { id, description, width, height, wrapping ->
                             publish(editor.updateImage(id, description, width, height, wrapping))
                         },
+                        onMoveImage = { id, x, y -> publish(editor.moveImage(id, x, y)) },
                         onDeleteObject = { id -> publish(editor.deleteObject(id)) },
                         selectedObjectId = selectedObjectId,
                         onSelectObject = { id ->
@@ -878,7 +904,9 @@ private fun DocumentCanvas(
     onDeleteTableRow: (String, Int) -> Unit,
     onDeleteTableColumn: (String, Int) -> Unit,
     onSetTableHeaderRows: (String, Int) -> Unit,
+    onMergeTableCells: (String, Int, Int, Int) -> Unit,
     onUpdateImage: (String, String, Float?, Float?, ImageWrapping) -> Unit,
+    onMoveImage: (String, Float, Float) -> Unit,
     onDeleteObject: (String) -> Unit,
     selectedObjectId: String?,
     onSelectObject: (String?) -> Unit,
@@ -938,7 +966,9 @@ private fun DocumentCanvas(
                                 onDeleteTableRow = onDeleteTableRow,
                                 onDeleteTableColumn = onDeleteTableColumn,
                                 onSetTableHeaderRows = onSetTableHeaderRows,
+                                onMergeTableCells = onMergeTableCells,
                                 onUpdateImage = onUpdateImage,
+                                onMoveImage = onMoveImage,
                                 onDeleteObject = onDeleteObject,
                                 selectedObjectId = selectedObjectId,
                                 onSelectObject = onSelectObject,
@@ -1014,7 +1044,9 @@ private fun StructuredObjects(
     onDeleteTableRow: (String, Int) -> Unit,
     onDeleteTableColumn: (String, Int) -> Unit,
     onSetTableHeaderRows: (String, Int) -> Unit,
+    onMergeTableCells: (String, Int, Int, Int) -> Unit,
     onUpdateImage: (String, String, Float?, Float?, ImageWrapping) -> Unit,
+    onMoveImage: (String, Float, Float) -> Unit,
     onDeleteObject: (String) -> Unit,
     selectedObjectId: String?,
     onSelectObject: (String?) -> Unit,
@@ -1029,10 +1061,10 @@ private fun StructuredObjects(
             is TableBlock -> EditableTable(
                 block, block.id == selectedObjectId, onSelectObject,
                 onUpdateTableCell, onResizeTable, onDeleteTableRow, onDeleteTableColumn,
-                onSetTableHeaderRows, onDeleteObject,
+                onSetTableHeaderRows, onMergeTableCells, onDeleteObject,
             )
             is ImageBlock -> EditableImage(
-                block, block.id == selectedObjectId, onSelectObject, onUpdateImage, onDeleteObject,
+                block, block.id == selectedObjectId, onSelectObject, onUpdateImage, onMoveImage, onDeleteObject,
             )
             else -> Unit
         }
@@ -1110,9 +1142,12 @@ private fun EditableTable(
     onDeleteRow: (String, Int) -> Unit,
     onDeleteColumn: (String, Int) -> Unit,
     onSetHeaderRows: (String, Int) -> Unit,
+    onMergeCells: (String, Int, Int, Int) -> Unit,
     onDelete: (String) -> Unit,
 ) {
     val columnCount = table.rows.first().cells.size
+    var activeCell by remember(table.id) { mutableStateOf<Pair<Int, Int>?>(null) }
+    val focusManager = LocalFocusManager.current
     val focusRequester = remember { FocusRequester() }
     Surface(
         modifier = Modifier
@@ -1150,19 +1185,32 @@ private fun EditableTable(
                     TextButton(onClick = { onSetHeaderRows(table.id, if (table.headerRowCount == 0) 1 else 0) }) {
                         Text(if (table.headerRowCount == 0) "Repeat first row" else "Stop repeating header")
                     }
+                    val cell = activeCell
+                    TextButton(
+                        enabled = cell != null && cell.second < columnCount - 1 && table.rows[cell.first].cells[cell.second + 1].columnSpan > 0,
+                        onClick = { cell?.let { onMergeCells(table.id, it.first, it.second, it.second + 1) } },
+                    ) { Text("Merge with next") }
                 }
             }
             table.rows.forEachIndexed { rowIndex, row ->
                 Row(Modifier.fillMaxWidth()) {
                     row.cells.forEachIndexed { columnIndex, cell ->
+                        if (cell.columnSpan == 0) return@forEachIndexed
                         val text = cell.blocks.joinToString("\n") { paragraph -> paragraph.runs.joinToString("") { it.text } }
-                        Surface(Modifier.weight(1f), color = Paper, border = BorderStroke(1.dp, Color(0xFFCAD3DF))) {
+                        Surface(Modifier.weight(cell.columnSpan.toFloat()), color = Paper, border = BorderStroke(if (activeCell == (rowIndex to columnIndex)) 2.dp else 1.dp, if (activeCell == (rowIndex to columnIndex)) CoreBlue else Color(0xFFCAD3DF))) {
                             BasicTextField(
                                 value = text,
                                 onValueChange = { onUpdateCell(table.id, rowIndex, columnIndex, it) },
                                 textStyle = TextStyle(color = PaperText, fontSize = 14.sp),
                                 cursorBrush = SolidColor(CoreBlue),
-                                modifier = Modifier.fillMaxWidth().padding(9.dp),
+                                modifier = Modifier.fillMaxWidth()
+                                    .onFocusChanged { if (it.isFocused) activeCell = rowIndex to columnIndex }
+                                    .onPreviewKeyEvent { event ->
+                                        if (event.type == KeyEventType.KeyDown && event.key == Key.Tab) {
+                                            focusManager.moveFocus(if (event.isShiftPressed) FocusDirection.Previous else FocusDirection.Next)
+                                        } else false
+                                    }
+                                    .padding(9.dp),
                                 decorationBox = { inner ->
                                     if (text.isEmpty()) Text("Cell", color = PaperText.copy(alpha = 0.38f), fontSize = 14.sp)
                                     inner()
@@ -1182,6 +1230,7 @@ private fun EditableImage(
     selected: Boolean,
     onSelect: (String?) -> Unit,
     onUpdate: (String, String, Float?, Float?, ImageWrapping) -> Unit,
+    onMove: (String, Float, Float) -> Unit,
     onDelete: (String) -> Unit,
 ) {
     val context = LocalContext.current
@@ -1198,10 +1247,13 @@ private fun EditableImage(
     val height = image.heightPoints ?: 200f
     var previewWidth by remember(image.id, width) { mutableStateOf(width) }
     var previewHeight by remember(image.id, height) { mutableStateOf(height) }
+    var previewX by remember(image.id, image.offsetXPoints) { mutableStateOf(image.offsetXPoints) }
+    var previewY by remember(image.id, image.offsetYPoints) { mutableStateOf(image.offsetYPoints) }
     val focusRequester = remember { FocusRequester() }
     Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .offset(previewX.dp, previewY.dp)
             .focusRequester(focusRequester)
             .focusable()
             .clickable { onSelect(image.id); focusRequester.requestFocus() }
@@ -1250,6 +1302,25 @@ private fun EditableImage(
                 TextButton(onClick = { onDelete(image.id) }) { Text("Delete") }
             }
             if (selected) {
+                Box(
+                    Modifier
+                        .background(MaterialTheme.colorScheme.secondaryContainer, RoundedCornerShape(8.dp))
+                        .semantics { contentDescription = "Drag to position picture" }
+                        .pointerInput(image.id, image.offsetXPoints, image.offsetYPoints) {
+                            detectDragGestures(
+                                onDragStart = { previewX = image.offsetXPoints; previewY = image.offsetYPoints },
+                                onDragEnd = { onMove(image.id, previewX, previewY) },
+                                onDragCancel = { previewX = image.offsetXPoints; previewY = image.offsetYPoints },
+                            ) { change, dragAmount ->
+                                change.consume()
+                                previewX = (previewX + dragAmount.x).coerceIn(0f, 1200f)
+                                previewY = (previewY + dragAmount.y).coerceIn(0f, 1200f)
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text("Move picture · ${previewX.toInt()}, ${previewY.toInt()} pt", fontWeight = FontWeight.SemiBold)
+                }
                 Box(
                     Modifier
                         .align(Alignment.End)

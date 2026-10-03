@@ -12,7 +12,10 @@ data class ImportedDocument(
     val body: RichTextDocument,
     val warnings: List<String> = emptyList(),
     val wordProcessingDocument: WordProcessingDocument? = null,
+    val embeddedImages: List<ImportedEmbeddedImage> = emptyList(),
 )
+
+data class ImportedEmbeddedImage(val blockId: String, val bytes: ByteArray, val extension: String)
 
 data class DocxEmbeddedImage(
     val bytes: ByteArray,
@@ -93,6 +96,7 @@ object DocumentFormats {
         var documentXml: ByteArray? = null
         var relationshipsXml: ByteArray? = null
         val marginParts = mutableMapOf<String, ByteArray>()
+        val mediaParts = mutableMapOf<String, ByteArray>()
         var entries = 0
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
             while (true) {
@@ -105,6 +109,8 @@ object DocumentFormats {
                     relationshipsXml = zip.readLimited(MAX_XML_BYTES)
                 } else if (entry.name.matches(Regex("word/(header|footer)\\d+\\.xml"))) {
                     marginParts[entry.name] = zip.readLimited(MAX_XML_BYTES)
+                } else if (entry.name.startsWith("word/media/") && !entry.isDirectory) {
+                    mediaParts[entry.name] = zip.readLimited(MAX_DOCUMENT_BYTES)
                 }
             }
         }
@@ -113,12 +119,14 @@ object DocumentFormats {
             relationshipsXml,
             fallbackTitle,
             marginParts,
+            mediaParts,
         )
         return ImportedDocument(
             title = parsed.document.title,
             body = R2DocumentBridge.toLegacyBody(parsed.document),
             warnings = parsed.warnings,
             wordProcessingDocument = parsed.document,
+            embeddedImages = parsed.embeddedImages,
         )
     }
 
@@ -224,7 +232,7 @@ object DocumentFormats {
             }
             "<w:p>$paragraphProperties${runs.joinToString("") { it.toWordXml() }}</w:p>"
         }
-        is TableBlock -> "<w:tbl>${rows.mapIndexed { rowIndex, row -> "<w:tr>${if (rowIndex < headerRowCount) "<w:trPr><w:tblHeader/></w:trPr>" else ""}${row.cells.joinToString("") { cell -> "<w:tc><w:tcPr>${if (cell.columnSpan > 1) "<w:gridSpan w:val=\"${cell.columnSpan}\"/>" else ""}</w:tcPr>${cell.blocks.joinToString("") { it.toWordXml(imageRelationships) }}</w:tc>" }}</w:tr>" }.joinToString("")}</w:tbl>"
+        is TableBlock -> "<w:tbl>${rows.mapIndexed { rowIndex, row -> "<w:tr>${if (rowIndex < headerRowCount) "<w:trPr><w:tblHeader/></w:trPr>" else ""}${row.cells.filter { it.columnSpan > 0 }.joinToString("") { cell -> "<w:tc><w:tcPr>${if (cell.columnSpan > 1) "<w:gridSpan w:val=\"${cell.columnSpan}\"/>" else ""}</w:tcPr>${cell.blocks.joinToString("") { it.toWordXml(imageRelationships) }}</w:tc>" }}</w:tr>" }.joinToString("")}</w:tbl>"
         is ImageBlock -> imageRelationships[id]?.let { relationshipId ->
             val width = ((widthPoints ?: 300f) * 12_700).toLong()
             val height = ((heightPoints ?: 200f) * 12_700).toLong()

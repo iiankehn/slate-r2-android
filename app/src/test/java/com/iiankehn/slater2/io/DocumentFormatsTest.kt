@@ -121,6 +121,12 @@ class DocumentFormatsTest {
         assertTrue("word/media/image1.png" in entries)
         assertTrue(entries.getValue("word/document.xml").toString(Charsets.UTF_8).contains("r:embed=\"rIdImage1\""))
         assertTrue(entries.getValue("word/_rels/document.xml.rels").toString(Charsets.UTF_8).contains("relationships/image"))
+
+        val imported = DocumentFormats.importDocx(bytes, "Pictures")
+        val importedImage = requireNotNull(imported.wordProcessingDocument).sections.single().blocks.filterIsInstance<ImageBlock>().single()
+        assertEquals("Chart", importedImage.description)
+        assertEquals(importedImage.id, imported.embeddedImages.single().blockId)
+        assertEquals(listOf<Byte>(1, 2, 3), imported.embeddedImages.single().bytes.toList())
     }
 
     @Test

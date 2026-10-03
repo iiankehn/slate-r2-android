@@ -98,6 +98,20 @@ class FlatTextEditorAdapterTest {
         assertEquals(null, adapter.selectedObjectId)
     }
 
+    @Test fun `picture position is editable and undoable`() {
+        val adapter = FlatTextEditorAdapter(document("One"))
+        adapter.insertImage(3, 3, "content://picture")
+        val image = adapter.document.sections.single().blocks.filterIsInstance<ImageBlock>().single()
+
+        adapter.moveImage(image.id, 48f, 72f)
+
+        val moved = adapter.document.sections.single().blocks.filterIsInstance<ImageBlock>().single()
+        assertEquals(48f, moved.offsetXPoints)
+        assertEquals(72f, moved.offsetYPoints)
+        adapter.undo()
+        assertEquals(0f, adapter.document.sections.single().blocks.filterIsInstance<ImageBlock>().single().offsetXPoints)
+    }
+
     private fun document(text: String) = WordProcessingDocument(
         "document", "", listOf(DocumentSection(blocks = listOf(ParagraphBlock("p", listOf(TextRun(text))))))
     )

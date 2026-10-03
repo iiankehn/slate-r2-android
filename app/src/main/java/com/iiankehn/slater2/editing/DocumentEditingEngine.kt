@@ -72,6 +72,7 @@ sealed interface DocumentCommand {
     data class DeleteTableRow(val tableId: String, val row: Int) : DocumentCommand
     data class DeleteTableColumn(val tableId: String, val column: Int) : DocumentCommand
     data class SetTableHeaderRows(val tableId: String, val count: Int) : DocumentCommand
+    data class MergeTableCells(val tableId: String, val row: Int, val startColumn: Int, val endColumn: Int) : DocumentCommand
     data class UpdateImage(
         val imageId: String,
         val description: String,
@@ -79,6 +80,7 @@ sealed interface DocumentCommand {
         val heightPoints: Float?,
         val wrapping: ImageWrapping,
     ) : DocumentCommand
+    data class MoveImage(val imageId: String, val offsetXPoints: Float, val offsetYPoints: Float) : DocumentCommand
     data class DeleteObject(val objectId: String) : DocumentCommand
 }
 
@@ -138,7 +140,9 @@ class DocumentEditingEngine(
             is DocumentCommand.DeleteTableRow -> deleteTableRow(snapshot, command)
             is DocumentCommand.DeleteTableColumn -> deleteTableColumn(snapshot, command)
             is DocumentCommand.SetTableHeaderRows -> setTableHeaderRows(snapshot, command)
+            is DocumentCommand.MergeTableCells -> mergeTableCells(snapshot, command)
             is DocumentCommand.UpdateImage -> updateImage(snapshot, command)
+            is DocumentCommand.MoveImage -> moveImage(snapshot, command)
             is DocumentCommand.DeleteObject -> deleteObject(snapshot, command.objectId)
         }
         return EditResult(updated, updated != snapshot)
@@ -317,7 +321,19 @@ class DocumentEditingEngine(
         val columns = table.rows.first().cells.size
         if (columns == 1 || command.column !in 0 until columns) return@updateObject block
         table.copy(rows = table.rows.map { row ->
-            row.copy(cells = row.cells.filterIndexed { index, _ -> index != command.column })
+            val owner = row.cells.indices.reversed().firstOrNull { index ->
+                index <= command.column && row.cells[index].columnSpan > 0 && index + row.cells[index].columnSpan > command.column
+            } ?: command.column
+            val removeIndex = if (row.cells[owner].columnSpan > 1 && owner == command.column) {
+                (owner + 1).coerceAtMost(row.cells.lastIndex)
+            } else command.column
+            row.copy(cells = row.cells.mapIndexedNotNull { index, cell ->
+                when {
+                    index == removeIndex -> null
+                    index == owner && cell.columnSpan > 1 -> cell.copy(columnSpan = cell.columnSpan - 1)
+                    else -> cell
+                }
+            })
         })
     }
 
@@ -327,6 +343,30 @@ class DocumentEditingEngine(
     ): EditorSnapshot = snapshot.updateObject(command.tableId) { block ->
         val table = block as? TableBlock ?: return@updateObject block
         table.copy(headerRowCount = command.count.coerceIn(0, table.rows.size))
+    }
+
+    private fun mergeTableCells(
+        snapshot: EditorSnapshot,
+        command: DocumentCommand.MergeTableCells,
+    ): EditorSnapshot = snapshot.updateObject(command.tableId) { block ->
+        val table = block as? TableBlock ?: return@updateObject block
+        if (command.row !in table.rows.indices) return@updateObject block
+        val row = table.rows[command.row]
+        val start = minOf(command.startColumn, command.endColumn)
+        val end = maxOf(command.startColumn, command.endColumn)
+        if (start !in row.cells.indices || end !in row.cells.indices || start == end) return@updateObject block
+        if (row.cells.subList(start, end + 1).any { it.columnSpan == 0 }) return@updateObject block
+        val source = row.cells[start]
+        val mergedBlocks = row.cells.subList(start, end + 1).flatMap { it.blocks }
+        val mergedSpan = row.cells.subList(start, end + 1).sumOf { it.columnSpan }
+        val cells = row.cells.mapIndexed { index, cell ->
+            when (index) {
+                start -> source.copy(blocks = mergedBlocks, columnSpan = mergedSpan)
+                in (start + 1)..end -> TableCell(columnSpan = 0, rowSpan = 0)
+                else -> cell
+            }
+        }
+        table.copy(rows = table.rows.mapIndexed { index, current -> if (index == command.row) current.copy(cells = cells) else current })
     }
 
     private fun updateImage(
@@ -339,6 +379,17 @@ class DocumentEditingEngine(
             widthPoints = command.widthPoints?.coerceIn(24f, 1200f),
             heightPoints = command.heightPoints?.coerceIn(24f, 1200f),
             wrapping = command.wrapping,
+        )
+    }
+
+    private fun moveImage(
+        snapshot: EditorSnapshot,
+        command: DocumentCommand.MoveImage,
+    ): EditorSnapshot = snapshot.updateObject(command.imageId) { block ->
+        val image = block as? ImageBlock ?: return@updateObject block
+        image.copy(
+            offsetXPoints = command.offsetXPoints.coerceIn(-1440f, 1440f),
+            offsetYPoints = command.offsetYPoints.coerceIn(-1440f, 1440f),
         )
     }
 

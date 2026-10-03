@@ -248,6 +248,25 @@ class DocumentEditingEngineTest {
     }
 
     @Test
+    fun adjacentTableCellsMergeAndRemainUndoable() {
+        val session = DocumentEditorSession(snapshot("One"), engine)
+        session.execute(DocumentCommand.InsertTable(2, 3))
+        val table = session.current.document.sections.single().blocks.filterIsInstance<TableBlock>().single()
+        session.execute(DocumentCommand.UpdateTableCell(table.id, 0, 0, "Left"))
+        session.execute(DocumentCommand.UpdateTableCell(table.id, 0, 1, "Right"))
+
+        session.execute(DocumentCommand.MergeTableCells(table.id, 0, 0, 1))
+
+        val merged = session.current.document.sections.single().blocks.filterIsInstance<TableBlock>().single()
+        assertEquals(2, merged.rows[0].cells[0].columnSpan)
+        assertEquals(0, merged.rows[0].cells[1].columnSpan)
+        assertEquals(listOf("Left", "Right"), merged.rows[0].cells[0].blocks.map { it.runs.joinToString("") { run -> run.text } })
+        session.undo()
+        val restored = session.current.document.sections.single().blocks.filterIsInstance<TableBlock>().single()
+        assertEquals(1, restored.rows[0].cells[0].columnSpan)
+    }
+
+    @Test
     fun backspaceAtParagraphStartJoinsParagraphs() {
         val result = engine.execute(
             snapshot("First", "Second").select(position(1, 0)),

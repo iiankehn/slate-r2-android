@@ -152,7 +152,8 @@ data class TableCell(
 ) {
     init {
         require(blocks.isNotEmpty()) { "A table cell needs content." }
-        require(columnSpan > 0 && rowSpan > 0) { "Table spans must be positive." }
+        require(columnSpan >= 0 && rowSpan >= 0) { "Table spans cannot be negative." }
+        require((columnSpan == 0) == (rowSpan == 0)) { "Covered merge cells must use zero for both spans." }
     }
 }
 
@@ -163,12 +164,15 @@ data class ImageBlock(
     val widthPoints: Float? = null,
     val heightPoints: Float? = null,
     val wrapping: ImageWrapping = ImageWrapping.Inline,
+    val offsetXPoints: Float = 0f,
+    val offsetYPoints: Float = 0f,
 ) : DocumentBlock {
     init {
         require(id.isNotBlank()) { "An image id cannot be blank." }
         require(sourceUri.isNotBlank()) { "An image needs a source URI." }
         require(widthPoints == null || widthPoints > 0f) { "Image width must be positive." }
         require(heightPoints == null || heightPoints > 0f) { "Image height must be positive." }
+        require(offsetXPoints in -1440f..1440f && offsetYPoints in -1440f..1440f) { "Image offsets exceed the supported range." }
     }
 }
 

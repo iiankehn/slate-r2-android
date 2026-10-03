@@ -185,10 +185,15 @@ class DocumentLayoutEngine(
         val width = (block.widthPoints ?: state.columnWidth).coerceAtMost(state.columnWidth)
         val requestedHeight = block.heightPoints ?: (width * 0.75f)
         val height = requestedHeight.coerceAtMost(state.columnHeight)
-        state.ensureSpace(height)
-        val top = state.y
-        state.advance(height)
-        state.add(LayoutFragment(block.id, FragmentKind.Image, PointRect(state.x, top, state.x + width, state.y)))
+        val offsetX = block.offsetXPoints.coerceIn(0f, (state.columnWidth - width).coerceAtLeast(0f))
+        val offsetY = block.offsetYPoints.coerceAtLeast(0f)
+        state.ensureSpace(height + offsetY)
+        val top = state.y + offsetY
+        val bottom = top + height
+        if (block.wrapping == com.iiankehn.slater2.model.ImageWrapping.Inline || block.wrapping == com.iiankehn.slater2.model.ImageWrapping.Square) {
+            state.advance(offsetY + height)
+        }
+        state.add(LayoutFragment(block.id, FragmentKind.Image, PointRect(state.x + offsetX, top, state.x + offsetX + width, bottom)))
     }
 
     private fun breakLines(runs: List<TextRun>, maxWidth: Float, spacing: Float): List<LaidOutTextLine> {

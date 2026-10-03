@@ -10,7 +10,7 @@ import java.util.Base64
 /** Versioned, bounded storage format for the complete R2 document model. */
 object R2DocumentCodec {
     private const val MAGIC = 0x534C5232
-    private const val VERSION = 3
+    private const val VERSION = 4
     private const val MAX_PAYLOAD_BYTES = 32 * 1024 * 1024
     private const val MAX_COLLECTION_SIZE = 100_000
     private const val MAX_STRING_BYTES = 8 * 1024 * 1024
@@ -105,6 +105,7 @@ object R2DocumentCodec {
         is ImageBlock -> {
             writeByte(3); writeString(value.id); writeString(value.sourceUri); writeString(value.description)
             writeNullableFloat(value.widthPoints); writeNullableFloat(value.heightPoints); writeInt(value.wrapping.ordinal)
+            writeFloat(value.offsetXPoints); writeFloat(value.offsetYPoints)
         }
     }
 
@@ -117,7 +118,11 @@ object R2DocumentCodec {
                 TableCell(readList { readParagraph(version) }, columnSpan, rowSpan)
             }) }, headerRows)
         }
-        3 -> ImageBlock(readString(), readString(), readString(), readNullableFloat(), readNullableFloat(), readEnum())
+        3 -> ImageBlock(
+            readString(), readString(), readString(), readNullableFloat(), readNullableFloat(), readEnum(),
+            if (version >= 4) readFloat() else 0f,
+            if (version >= 4) readFloat() else 0f,
+        )
         else -> throw IllegalArgumentException("Unknown R2 block type.")
     }
 

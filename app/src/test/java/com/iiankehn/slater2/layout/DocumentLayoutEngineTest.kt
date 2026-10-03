@@ -113,4 +113,23 @@ class DocumentLayoutEngineTest {
         assertEquals(first.pageCount, second.pageCount)
         assertEquals(first.blockLocations, second.blockLocations)
     }
+
+    @Test
+    fun floatingImageOffsetsAreReflectedWithoutConsumingTextFlow() {
+        val image = ImageBlock(
+            "float", "content://picture", widthPoints = 100f, heightPoints = 80f,
+            wrapping = com.iiankehn.slater2.model.ImageWrapping.InFrontOfText,
+            offsetXPoints = 36f, offsetYPoints = 24f,
+        )
+        val document = WordProcessingDocument(
+            "floating", "", listOf(DocumentSection(blocks = listOf(ParagraphBlock("before"), image, ParagraphBlock("after")))),
+        )
+
+        val layout = engine.layout(document)
+        val imageBounds = layout.blockLocations.getValue("float").single().second
+        val afterBounds = layout.blockLocations.getValue("after").single().second
+
+        assertEquals(document.sections.single().page.margins.startPoints + 36f, imageBounds.left)
+        assertTrue(afterBounds.top < imageBounds.bottom)
+    }
 }

@@ -136,6 +136,11 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
         return state()
     }
 
+    fun mergeTableCells(tableId: String, row: Int, startColumn: Int, endColumn: Int): FlatEditorState {
+        session.execute(DocumentCommand.MergeTableCells(tableId, row, startColumn, endColumn))
+        return state()
+    }
+
     fun updateImage(
         imageId: String,
         description: String,
@@ -144,6 +149,11 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
         wrapping: ImageWrapping,
     ): FlatEditorState {
         session.execute(DocumentCommand.UpdateImage(imageId, description, widthPoints, heightPoints, wrapping))
+        return state()
+    }
+
+    fun moveImage(imageId: String, offsetXPoints: Float, offsetYPoints: Float): FlatEditorState {
+        session.execute(DocumentCommand.MoveImage(imageId, offsetXPoints, offsetYPoints))
         return state()
     }
 
