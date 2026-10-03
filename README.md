@@ -38,7 +38,7 @@ R2 is intended to become a complete word processor rather than a larger notes ap
 - higher-fidelity DOCX interchange and deterministic PDF/print output;
 - responsive workspaces across all supported form factors and input methods.
 
-See [Product](docs/PRODUCT.md), [Architecture](docs/ARCHITECTURE.md), [Features](docs/FEATURES.md), and [Roadmap](docs/ROADMAP.md).
+See [Product](docs/PRODUCT.md), [Architecture](docs/ARCHITECTURE.md), [Features](docs/FEATURES.md), [Visual identity](docs/BRAND.md), and [Roadmap](docs/ROADMAP.md).
 
 ## Build
 
