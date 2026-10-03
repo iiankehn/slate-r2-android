@@ -117,7 +117,8 @@ class DocumentLayoutEngine(
     }
 
     private fun flowParagraph(block: ParagraphBlock, state: SectionFlow) {
-        val width = state.columnWidth - block.style.startIndentPoints - block.style.endIndentPoints
+        val textRegion = state.textRegion()
+        val width = textRegion.width - block.style.startIndentPoints - block.style.endIndentPoints
         val lines = breakLines(block.runs, width.coerceAtLeast(24f), block.style.lineSpacing)
         state.ensureSpace(block.style.spaceBeforePoints + lines.firstOrNull()?.bounds?.height.orZero())
         state.advance(block.style.spaceBeforePoints)
@@ -133,14 +134,14 @@ class DocumentLayoutEngine(
             }
             var lineTop = top
             val positioned = lines.subList(start, index).map { line ->
-                line.copy(bounds = PointRect(state.x + block.style.startIndentPoints, lineTop, state.x + block.style.startIndentPoints + width, lineTop + line.bounds.height))
+                line.copy(bounds = PointRect(textRegion.left + block.style.startIndentPoints, lineTop, textRegion.left + block.style.startIndentPoints + width, lineTop + line.bounds.height))
                     .also { lineTop += line.bounds.height }
             }
             state.add(
                 LayoutFragment(
                     blockId = block.id,
                     kind = FragmentKind.Paragraph,
-                    bounds = PointRect(state.x, top, state.x + state.columnWidth, state.y),
+                    bounds = PointRect(textRegion.left, top, textRegion.right, state.y),
                     lines = positioned,
                     continuedFromPrevious = continued,
                     continuesOnNext = index < lines.size,
@@ -154,7 +155,7 @@ class DocumentLayoutEngine(
             state.ensureSpace(height)
             val top = state.y
             state.advance(height)
-            state.add(LayoutFragment(block.id, FragmentKind.Paragraph, PointRect(state.x, top, state.x + state.columnWidth, state.y)))
+            state.add(LayoutFragment(block.id, FragmentKind.Paragraph, PointRect(textRegion.left, top, textRegion.right, state.y)))
         }
         state.advance(block.style.spaceAfterPoints.coerceAtMost(state.remainingHeight))
     }
@@ -190,8 +191,10 @@ class DocumentLayoutEngine(
         state.ensureSpace(height + offsetY)
         val top = state.y + offsetY
         val bottom = top + height
-        if (block.wrapping == com.iiankehn.slater2.model.ImageWrapping.Inline || block.wrapping == com.iiankehn.slater2.model.ImageWrapping.Square) {
-            state.advance(offsetY + height)
+        when (block.wrapping) {
+            com.iiankehn.slater2.model.ImageWrapping.Inline -> state.advance(offsetY + height)
+            com.iiankehn.slater2.model.ImageWrapping.Square -> state.exclude(PointRect(state.x + offsetX, top, state.x + offsetX + width, bottom))
+            else -> Unit
         }
         state.add(LayoutFragment(block.id, FragmentKind.Image, PointRect(state.x + offsetX, top, state.x + offsetX + width, bottom)))
     }
@@ -261,10 +264,22 @@ class DocumentLayoutEngine(
         val columnHeight get() = column.bounds.height
         val remainingHeight get() = column.bounds.bottom - y
         val hasContent get() = page.columns.any { it.fragments.isNotEmpty() }
+        private val exclusions = mutableListOf<PointRect>()
 
         fun add(fragment: LayoutFragment) { column.fragments += fragment }
         fun advance(points: Float) { y += points }
         fun ensureSpace(points: Float) { if (points > remainingHeight && hasContent) nextColumn() }
+        fun exclude(bounds: PointRect) { exclusions += bounds }
+        fun textRegion(): PointRect {
+            val bounds = column.bounds
+            val exclusion = exclusions.lastOrNull { y >= it.top && y < it.bottom } ?: return bounds
+            val gap = 8f
+            return if (exclusion.left <= bounds.left + bounds.width / 2f) {
+                PointRect((exclusion.right + gap).coerceAtMost(bounds.right - 24f), bounds.top, bounds.right, bounds.bottom)
+            } else {
+                PointRect(bounds.left, bounds.top, (exclusion.left - gap).coerceAtLeast(bounds.left + 24f), bounds.bottom)
+            }
+        }
 
         fun nextColumn() {
             if (columnIndex + 1 < page.columns.size) {

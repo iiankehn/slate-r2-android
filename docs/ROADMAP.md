@@ -39,7 +39,7 @@ Current development focus moves from core editing toward precise object and docu
 - [x] Stacked editable pages, page-aware text ranges and objects, thumbnail navigation, and active-page status
 - [x] Section-aware repeated headers and footers with phone dialog and desktop inspector editing
 - [x] Direct picture resize handle and continuous/next/odd/even section starts
-- True floating-object layout and text exclusion around positioned objects
+- [x] Floating picture positioning, overlay modes, and square-wrap text exclusion
 
 ## Interchange
 
@@ -49,7 +49,8 @@ Current development focus moves from core editing toward precise object and docu
 - [x] Markdown and plain-text boundary adapters
 - [x] Structural DOCX import for styled runs, tables, links, and page setup
 - [x] DOCX numbering definitions, repeating table headers, embedded image relationships, and header/footer parts
-- Imported embedded-media extraction and broader third-party fidelity fixtures
+- [x] Imported embedded-picture extraction into durable private app storage
+- Broader third-party DOCX fidelity fixtures remain an ongoing compatibility track
 
 ## Release readiness
 

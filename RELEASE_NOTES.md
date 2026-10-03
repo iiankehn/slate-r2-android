@@ -1,5 +1,14 @@
 # Slate R2 release notes
 
+## R2 baseline release candidate
+
+- Completed the planned R2 editing, pagination, object, table, section, interchange, accessibility, and form-factor foundation.
+- Added adjacent table-cell merging and hardware-keyboard traversal between cells.
+- Added durable extraction of embedded DOCX pictures into Slate's private storage.
+- Added draggable picture positioning with inline, square, behind-text, and in-front-of-text layout behavior.
+- Added square-wrap text exclusion so document text flows beside positioned pictures.
+- Promoted the development tree to release-candidate status; signing credentials and the documented installation smoke check are the remaining publication gates.
+
 ## Development update — roadmap completion pass
 
 - Added cross-section text replacement while preserving the following section's page configuration.

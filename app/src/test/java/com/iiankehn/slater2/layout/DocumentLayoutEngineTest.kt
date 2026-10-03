@@ -132,4 +132,22 @@ class DocumentLayoutEngineTest {
         assertEquals(document.sections.single().page.margins.startPoints + 36f, imageBounds.left)
         assertTrue(afterBounds.top < imageBounds.bottom)
     }
+
+    @Test
+    fun squareWrappedImageCreatesTextExclusionRegion() {
+        val image = ImageBlock(
+            "square", "content://picture", widthPoints = 120f, heightPoints = 100f,
+            wrapping = com.iiankehn.slater2.model.ImageWrapping.Square,
+        )
+        val document = WordProcessingDocument(
+            "wrapped", "", listOf(DocumentSection(blocks = listOf(image, ParagraphBlock("text", listOf(TextRun("Wrapped text ".repeat(20))))))),
+        )
+
+        val layout = engine.layout(document)
+        val imageBounds = layout.blockLocations.getValue("square").single().second
+        val textBounds = layout.blockLocations.getValue("text").first().second
+
+        assertTrue(textBounds.left > imageBounds.left)
+        assertTrue(textBounds.top < imageBounds.bottom)
+    }
 }
