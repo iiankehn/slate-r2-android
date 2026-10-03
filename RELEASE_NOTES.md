@@ -28,7 +28,7 @@
 - Inserted objects now become selected immediately, and undo/redo restores their selection state.
 - Moving the text caret clears object selection so text and object editing remain unambiguous.
 
-Slate R2 is in active foundation development and has not published an official release.
+Slate R2 has completed baseline development and is awaiting its first signed monthly publication.
 
 ## Unreleased development build
 
@@ -52,6 +52,6 @@ Slate R2 is in active foundation development and has not published an official r
 - Added CI checks for unit tests, lint, APK assembly, and ARM64/x86_64 native dependency coverage.
 - Made the monthly workflow validate an unsigned build without failing when signing secrets are intentionally absent; publishing remains gated on all signing secrets.
 
-Known blockers before the first official build are precise page-line placement, advanced table and floating-object manipulation, richer DOCX import and embedded media, accessibility/performance audits, and the device acceptance matrix.
+The baseline engineering blockers are resolved. Publication now depends on repository signing credentials and the short signed-install/update smoke check in `docs/ACCEPTANCE_MATRIX.md`.
 
 R2 releases will use monthly tags in the form `r2-YYYY-MM`. This naming is independent of Slate R1 and does not imply an upgrade sequence between the two products.

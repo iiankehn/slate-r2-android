@@ -6,9 +6,11 @@ Slate R2 is a native, local-first word processor for Android. It is designed for
 
 ## Project status
 
-R2 is in foundation development. There is no official R2 release yet.
+The Slate R2 baseline is feature-complete and in release-candidate validation. The first official signed monthly release is pending repository signing credentials and the documented installation smoke check.
 
-The current foundation includes:
+Visit the [Slate R2 website](https://iiankehn.github.io/slate-r2-android/) for the product overview and official downloads.
+
+The R2 baseline includes:
 
 - a distinct `com.iiankehn.slater2` Android application;
 - native Kotlin and Jetpack Compose targeting Android 12 and newer;
