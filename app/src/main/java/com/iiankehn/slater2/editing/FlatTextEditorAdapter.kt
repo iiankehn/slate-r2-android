@@ -19,6 +19,7 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
     val canUndo: Boolean get() = session.canUndo
     val canRedo: Boolean get() = session.canRedo
     val activeSectionIndex: Int get() = session.current.selection.focus.sectionIndex
+    val selectedObjectId: String? get() = session.current.selectedObjectId
 
     fun state(): FlatEditorState {
         index = FlatDocumentIndex(document)
@@ -127,6 +128,16 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
 
     fun deleteObject(objectId: String): FlatEditorState {
         session.execute(DocumentCommand.DeleteObject(objectId))
+        return state()
+    }
+
+    fun selectObject(objectId: String?): FlatEditorState {
+        session.selectObject(objectId)
+        return state()
+    }
+
+    fun deleteSelectedObject(): FlatEditorState {
+        selectedObjectId?.let { session.execute(DocumentCommand.DeleteObject(it)) }
         return state()
     }
 

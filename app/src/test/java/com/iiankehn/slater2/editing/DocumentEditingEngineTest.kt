@@ -10,6 +10,7 @@ import com.iiankehn.slater2.model.ParagraphBlock
 import com.iiankehn.slater2.model.ParagraphStyle
 import com.iiankehn.slater2.model.TextRun
 import com.iiankehn.slater2.model.WordProcessingDocument
+import com.iiankehn.slater2.model.TableBlock
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -238,6 +239,20 @@ class DocumentEditingEngineTest {
         assertEquals(listOf("Slate R2"), session.current.paragraphTexts())
         session.execute(DocumentCommand.DeleteBackward)
         assertFalse(session.canRedo)
+    }
+
+    @Test
+    fun objectSelectionIsValidatedAndDoesNotCreateHistory() {
+        val withTable = engine.execute(snapshot("One"), DocumentCommand.InsertTable()).snapshot
+        val table = withTable.document.sections.single().blocks.filterIsInstance<TableBlock>().single()
+        val session = DocumentEditorSession(withTable, engine)
+
+        session.selectObject(table.id)
+
+        assertEquals(table.id, session.current.selectedObjectId)
+        assertFalse(session.canUndo)
+        session.updateSelection(session.current.selection)
+        assertEquals(null, session.current.selectedObjectId)
     }
 
     @Test(expected = IllegalArgumentException::class)

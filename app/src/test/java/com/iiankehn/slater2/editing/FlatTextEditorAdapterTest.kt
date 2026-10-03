@@ -72,6 +72,32 @@ class FlatTextEditorAdapterTest {
         assertTrue(adapter.document.sections.single().blocks.any { it is ImageBlock })
     }
 
+    @Test fun `inserted objects are selected and selected deletion is undoable`() {
+        val adapter = FlatTextEditorAdapter(document("One"))
+
+        adapter.insertTable(3, 3)
+        val table = adapter.document.sections.single().blocks.filterIsInstance<TableBlock>().single()
+        assertEquals(table.id, adapter.selectedObjectId)
+
+        adapter.deleteSelectedObject()
+        assertTrue(adapter.document.sections.single().blocks.none { it is TableBlock })
+        assertEquals(null, adapter.selectedObjectId)
+
+        adapter.undo()
+        assertTrue(adapter.document.sections.single().blocks.any { it is TableBlock })
+        assertEquals(table.id, adapter.selectedObjectId)
+    }
+
+    @Test fun `moving the text selection clears object selection`() {
+        val adapter = FlatTextEditorAdapter(document("One"))
+        adapter.insertImage(3, 3, "content://picture")
+        assertTrue(adapter.selectedObjectId != null)
+
+        adapter.replace(adapter.state().text, 0, 0)
+
+        assertEquals(null, adapter.selectedObjectId)
+    }
+
     private fun document(text: String) = WordProcessingDocument(
         "document", "", listOf(DocumentSection(blocks = listOf(ParagraphBlock("p", listOf(TextRun(text))))))
     )

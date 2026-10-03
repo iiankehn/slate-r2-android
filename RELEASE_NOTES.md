@@ -1,5 +1,13 @@
 # Slate R2 release notes
 
+## Development update — object selection
+
+- Added first-class table and picture selection state without polluting undo history.
+- Added a clear Material 3 selection frame for touch and pointer workflows.
+- Added Delete/Backspace removal when a selected object owns keyboard focus.
+- Inserted objects now become selected immediately, and undo/redo restores their selection state.
+- Moving the text caret clears object selection so text and object editing remain unambiguous.
+
 Slate R2 is in active foundation development and has not published an official release.
 
 ## Unreleased development build

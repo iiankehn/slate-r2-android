@@ -22,7 +22,7 @@ R2 uses capability milestones rather than treating its name as a sequence after 
 - [x] Named style, list, page-break, and page-setup command routing
 - [x] Tab insertion, Tab/Shift+Tab list nesting, checklist paragraphs, and multilevel markers
 - [x] Next-page section insertion, inherited setup, editable headers/footers, and boundary deletion
-- Object selections
+- [x] Object selection, focus treatment, and keyboard deletion for tables and pictures
 
 ## Layout engine
 

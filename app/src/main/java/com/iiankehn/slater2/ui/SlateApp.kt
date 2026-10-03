@@ -12,6 +12,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -78,6 +79,7 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -367,11 +369,13 @@ private fun WordProcessorWorkspace(
     var showHeaderFooterEditor by remember(document.id) { mutableStateOf(false) }
     val editor = remember(document.id) { FlatTextEditorAdapter(document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)) }
     var editorValue by remember(document.id) { mutableStateOf(TextFieldValue(annotatedBody(editor.legacyBody(), editor.document))) }
+    var selectedObjectId by remember(document.id) { mutableStateOf<String?>(null) }
     val focusRequester = remember { FocusRequester() }
     fun publish(state: com.iiankehn.slater2.editing.FlatEditorState) {
         val body = editor.legacyBody()
         val selection = TextRange(state.selectionStart, state.selectionEnd)
         editorValue = TextFieldValue(annotatedBody(body, editor.document), selection.coerceIn(0, body.text.length))
+        selectedObjectId = editor.selectedObjectId
         onChange(document.copy(body = body, wordProcessingDocument = editor.document.copy(title = document.title)))
     }
     fun toggle(style: RichTextStyle) {
@@ -468,6 +472,11 @@ private fun WordProcessorWorkspace(
                             publish(editor.updateImage(id, description, width, height, wrapping))
                         },
                         onDeleteObject = { id -> publish(editor.deleteObject(id)) },
+                        selectedObjectId = selectedObjectId,
+                        onSelectObject = { id ->
+                            editor.selectObject(id)
+                            selectedObjectId = editor.selectedObjectId
+                        },
                         activePage = activePage,
                         onActivePageChange = { activePage = it },
                     )
@@ -770,6 +779,8 @@ private fun DocumentCanvas(
     onResizeTable: (String, Int, Int) -> Unit,
     onUpdateImage: (String, String, Float?, Float?, ImageWrapping) -> Unit,
     onDeleteObject: (String) -> Unit,
+    selectedObjectId: String?,
+    onSelectObject: (String?) -> Unit,
     activePage: Int,
     onActivePageChange: (Int) -> Unit,
 ) {
@@ -824,6 +835,8 @@ private fun DocumentCanvas(
                                 onResizeTable = onResizeTable,
                                 onUpdateImage = onUpdateImage,
                                 onDeleteObject = onDeleteObject,
+                                selectedObjectId = selectedObjectId,
+                                onSelectObject = onSelectObject,
                             )
                             BasicTextField(
                             value = pageValue,
@@ -895,6 +908,8 @@ private fun StructuredObjects(
     onResizeTable: (String, Int, Int) -> Unit,
     onUpdateImage: (String, String, Float?, Float?, ImageWrapping) -> Unit,
     onDeleteObject: (String) -> Unit,
+    selectedObjectId: String?,
+    onSelectObject: (String?) -> Unit,
 ) {
     val objectIds = layout.pages[pageIndex].columns.flatMap { it.fragments }
         .filter { it.kind == FragmentKind.Table || it.kind == FragmentKind.Image }
@@ -903,8 +918,13 @@ private fun StructuredObjects(
     if (objects.isEmpty()) return
     Column(Modifier.fillMaxWidth().padding(horizontal = 72.dp, vertical = 18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         objects.forEach { block -> when (block) {
-            is TableBlock -> EditableTable(block, onUpdateTableCell, onResizeTable, onDeleteObject)
-            is ImageBlock -> EditableImage(block, onUpdateImage, onDeleteObject)
+            is TableBlock -> EditableTable(
+                block, block.id == selectedObjectId, onSelectObject,
+                onUpdateTableCell, onResizeTable, onDeleteObject,
+            )
+            is ImageBlock -> EditableImage(
+                block, block.id == selectedObjectId, onSelectObject, onUpdateImage, onDeleteObject,
+            )
             else -> Unit
         }
         }
@@ -967,12 +987,30 @@ private fun ListMarkerOverlay(document: WordProcessingDocument, layout: Document
 @Composable
 private fun EditableTable(
     table: TableBlock,
+    selected: Boolean,
+    onSelect: (String?) -> Unit,
     onUpdateCell: (String, Int, Int, String) -> Unit,
     onResize: (String, Int, Int) -> Unit,
     onDelete: (String) -> Unit,
 ) {
     val columnCount = table.rows.first().cells.size
-    Surface(color = Color(0xFFF7F9FC), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Color(0xFFCAD3DF))) {
+    val focusRequester = remember { FocusRequester() }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester)
+            .focusable()
+            .clickable { onSelect(table.id); focusRequester.requestFocus() }
+            .onKeyEvent { event ->
+                if (selected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                    onDelete(table.id)
+                    true
+                } else false
+            },
+        color = Color(0xFFF7F9FC),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(if (selected) 3.dp else 1.dp, if (selected) CoreBlue else Color(0xFFCAD3DF)),
+    ) {
         Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Table · ${table.rows.size} × $columnCount", color = PaperText, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
@@ -1007,6 +1045,8 @@ private fun EditableTable(
 @Composable
 private fun EditableImage(
     image: ImageBlock,
+    selected: Boolean,
+    onSelect: (String?) -> Unit,
     onUpdate: (String, String, Float?, Float?, ImageWrapping) -> Unit,
     onDelete: (String) -> Unit,
 ) {
@@ -1022,7 +1062,23 @@ private fun EditableImage(
     }
     val width = image.widthPoints ?: 300f
     val height = image.heightPoints ?: 200f
-    Surface(color = Color(0xFFF7F9FC), shape = RoundedCornerShape(8.dp), border = BorderStroke(1.dp, Color(0xFFCAD3DF))) {
+    val focusRequester = remember { FocusRequester() }
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(focusRequester)
+            .focusable()
+            .clickable { onSelect(image.id); focusRequester.requestFocus() }
+            .onKeyEvent { event ->
+                if (selected && event.type == KeyEventType.KeyDown && (event.key == Key.Delete || event.key == Key.Backspace)) {
+                    onDelete(image.id)
+                    true
+                } else false
+            },
+        color = Color(0xFFF7F9FC),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(if (selected) 3.dp else 1.dp, if (selected) CoreBlue else Color(0xFFCAD3DF)),
+    ) {
         Column(Modifier.fillMaxWidth().padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (bitmap != null) {
                 Image(

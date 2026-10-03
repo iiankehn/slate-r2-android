@@ -79,6 +79,7 @@ sealed interface DocumentCommand {
 data class EditorSnapshot(
     val document: WordProcessingDocument,
     val selection: DocumentSelection,
+    val selectedObjectId: String? = null,
 )
 
 data class EditResult(
@@ -97,7 +98,7 @@ class DocumentEditingEngine(
     private val paragraphIdFactory: () -> String = { "paragraph-${UUID.randomUUID()}" },
 ) {
     fun execute(snapshot: EditorSnapshot, command: DocumentCommand): EditResult {
-        snapshot.document.requireValid(snapshot.selection)
+        snapshot.document.requireValid(snapshot)
         val updated = when (command) {
             is DocumentCommand.ReplaceSelection -> replaceSelection(snapshot, command.text)
             DocumentCommand.DeleteBackward -> deleteBackward(snapshot)
@@ -226,6 +227,7 @@ class DocumentEditingEngine(
         return EditorSnapshot(
             snapshot.document.replaceSection(position.sectionIndex, section.copy(blocks = blocks)),
             DocumentSelection(DocumentPosition(position.sectionIndex, insertionIndex + 1, 0)),
+            selectedObjectId = block.id,
         )
     }
 
@@ -289,7 +291,10 @@ class DocumentEditingEngine(
             }
             section.copy(blocks = filtered.ifEmpty { listOf(ParagraphBlock(id = paragraphIdFactory())) })
         }
-        return if (!removed) snapshot else snapshot.copy(document = snapshot.document.copy(sections = sections).touch())
+        return if (!removed) snapshot else snapshot.copy(
+            document = snapshot.document.copy(sections = sections).touch(),
+            selectedObjectId = snapshot.selectedObjectId.takeUnless { it == objectId },
+        )
     }
 
     private fun replaceSelection(snapshot: EditorSnapshot, insertedText: String): EditorSnapshot {
@@ -491,7 +496,7 @@ class DocumentEditorSession(
 ) {
     init {
         require(historyLimit > 0) { "History must retain at least one edit." }
-        initial.document.requireValid(initial.selection)
+        initial.document.requireValid(initial)
     }
 
     var current: EditorSnapshot = initial
@@ -519,8 +524,15 @@ class DocumentEditorSession(
     }
 
     fun updateSelection(selection: DocumentSelection) {
-        current.document.requireValid(selection)
-        current = current.copy(selection = selection)
+        current.document.requireValid(current.copy(selection = selection, selectedObjectId = null))
+        current = current.copy(selection = selection, selectedObjectId = null)
+    }
+
+    /** Object focus is transient editor state and deliberately does not create an undo step. */
+    fun selectObject(objectId: String?) {
+        val updated = current.copy(selectedObjectId = objectId)
+        current.document.requireValid(updated)
+        current = updated
     }
 
     fun undo(): EditorSnapshot {
@@ -538,7 +550,8 @@ class DocumentEditorSession(
     }
 }
 
-private fun WordProcessingDocument.requireValid(selection: DocumentSelection) {
+private fun WordProcessingDocument.requireValid(snapshot: EditorSnapshot) {
+    val selection = snapshot.selection
     listOf(selection.anchor, selection.focus).forEach { position ->
         require(position.sectionIndex in sections.indices) { "Selection section does not exist." }
         val section = sections[position.sectionIndex]
@@ -546,6 +559,11 @@ private fun WordProcessingDocument.requireValid(selection: DocumentSelection) {
         val paragraph = section.blocks[position.blockIndex] as? ParagraphBlock
             ?: error("Text selections must resolve to paragraphs.")
         require(position.offset <= paragraph.textLength) { "Selection offset exceeds paragraph text." }
+    }
+    snapshot.selectedObjectId?.let { objectId ->
+        require(sections.any { section -> section.blocks.any { it.id == objectId && it !is ParagraphBlock } }) {
+            "Selected object does not exist."
+        }
     }
 }
 
