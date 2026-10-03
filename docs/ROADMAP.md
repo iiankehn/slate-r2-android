@@ -2,6 +2,8 @@
 
 R2 uses capability milestones rather than treating its name as a sequence after R1.
 
+Current development focus moves from core editing toward precise object and document layout behavior.
+
 ## Foundation — in progress
 
 - Independent application package, repository, updater, CI, and monthly release workflow
