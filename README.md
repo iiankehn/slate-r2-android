@@ -8,7 +8,7 @@ Slate R2 is a native, local-first word processor for Android. It is designed for
 
 The Slate R2 baseline is feature-complete and in release-candidate validation. The first official signed monthly release is pending repository signing credentials and the documented installation smoke check.
 
-Visit the [Slate R2 website](https://iiankehn.github.io/slate-r2-android/) for the product overview and official downloads.
+Visit the [Slate website](https://slate.iiankehn.com/) to compare the distinct R1 and R2 products, open their repositories, and find official downloads.
 
 The R2 baseline includes:
 

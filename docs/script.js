@@ -1,40 +1,66 @@
-const menuButton = document.querySelector('.menu-button');
-const navigation = document.querySelector('#site-nav');
-const themeButton = document.querySelector('.theme-button');
+const nav = document.querySelector("#site-nav");
+const menuButton = document.querySelector(".menu-button");
+const themeButton = document.querySelector(".theme-button");
+
+menuButton?.addEventListener("click", () => {
+  const open = nav.classList.toggle("open");
+  menuButton.setAttribute("aria-expanded", String(open));
+});
+nav?.querySelectorAll("a").forEach((link) => link.addEventListener("click", () => {
+  nav.classList.remove("open");
+  menuButton?.setAttribute("aria-expanded", "false");
+}));
+
 const root = document.documentElement;
-
-menuButton?.addEventListener('click', () => {
-  const open = navigation.classList.toggle('open');
-  menuButton.setAttribute('aria-expanded', String(open));
+const storedTheme = localStorage.getItem("slate-theme");
+if (storedTheme === "light" || storedTheme === "dark") root.dataset.theme = storedTheme;
+themeButton?.addEventListener("click", () => {
+  const systemDark = matchMedia("(prefers-color-scheme: dark)").matches;
+  const next = root.dataset.theme === "dark" ? "light" : root.dataset.theme === "light" ? "dark" : systemDark ? "light" : "dark";
+  root.dataset.theme = next;
+  localStorage.setItem("slate-theme", next);
 });
 
-navigation?.addEventListener('click', () => {
-  navigation.classList.remove('open');
-  menuButton?.setAttribute('aria-expanded', 'false');
-});
+const products = {
+  r1: {
+    repo: "iiankehn/slate-android",
+    fallback: "https://github.com/iiankehn/slate-android/releases",
+    readyCopy: "Latest signed monthly APK with verified update metadata."
+  },
+  r2: {
+    repo: "iiankehn/slate-r2-android",
+    fallback: "https://github.com/iiankehn/slate-r2-android/releases",
+    readyCopy: "Latest signed monthly R2 APK."
+  }
+};
 
-const savedTheme = localStorage.getItem('slate-theme');
-if (savedTheme === 'light' || savedTheme === 'dark') root.dataset.theme = savedTheme;
+const setProduct = (key, selector, value) => {
+  document.querySelectorAll(`[data-product="${key}"][data-${selector}]`).forEach((node) => {
+    if (selector === "release-link") node.href = value;
+    else node.textContent = value;
+  });
+};
 
-themeButton?.addEventListener('click', () => {
-  const systemDark = matchMedia('(prefers-color-scheme: dark)').matches;
-  const currentDark = root.dataset.theme ? root.dataset.theme === 'dark' : systemDark;
-  root.dataset.theme = currentDark ? 'light' : 'dark';
-  localStorage.setItem('slate-theme', root.dataset.theme);
-});
-
-fetch('https://api.github.com/repos/iiankehn/slate-r2-android/releases/latest', {
-  headers: { Accept: 'application/vnd.github+json' }
-}).then(response => {
-  if (!response.ok) throw new Error('No published release');
-  return response.json();
-}).then(release => {
-  const apk = release.assets?.find(asset => asset.name.toLowerCase().endsWith('.apk'));
-  if (!apk) return;
-  document.querySelectorAll('[data-release-link]').forEach(link => link.href = apk.browser_download_url);
-  document.querySelectorAll('[data-release-version]').forEach(label => label.textContent = release.name || release.tag_name);
-  document.querySelectorAll('[data-release-status]').forEach(label => label.textContent = `${release.name || release.tag_name} · signed sideload`);
-  document.querySelectorAll('[data-download-copy]').forEach(label => label.textContent = 'Download the signed universal APK directly from the official Slate R2 GitHub release.');
-}).catch(() => {
-  // The static release-candidate copy remains visible until the first signed release is published.
+Object.entries(products).forEach(async ([key, product]) => {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${product.repo}/releases/latest`, {
+      headers: { Accept: "application/vnd.github+json" }
+    });
+    if (!response.ok) throw new Error("No public release");
+    const release = await response.json();
+    const apk = release.assets?.find((asset) => asset.name.toLowerCase().endsWith(".apk"));
+    if (!apk) throw new Error("No APK asset");
+    setProduct(key, "release-link", apk.browser_download_url);
+    setProduct(key, "release-version", release.name || release.tag_name);
+    setProduct(key, "release-status", "Signed release available");
+    setProduct(key, "download-copy", product.readyCopy);
+    document.querySelectorAll(`[data-product="${key}"]`).forEach((node) => {
+      const card = node.closest(".product-card");
+      card?.querySelector(".status-dot")?.classList.replace("pending", "live");
+    });
+  } catch {
+    document.querySelectorAll(`[data-product="${key}"][data-release-link]`).forEach((node) => {
+      if (!node.href) node.href = product.fallback;
+    });
+  }
 });
