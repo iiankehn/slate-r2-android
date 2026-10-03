@@ -21,7 +21,8 @@ R2 uses capability milestones rather than treating its name as a sequence after 
 - [x] IME-safe diff routing plus keyboard formatting and undo/redo
 - [x] Named style, list, page-break, and page-setup command routing
 - [x] Tab insertion, Tab/Shift+Tab list nesting, checklist paragraphs, and multilevel markers
-- Section-boundary editing and object selections
+- [x] Next-page section insertion, inherited setup, editable headers/footers, and boundary deletion
+- Object selections
 
 ## Layout engine
 
@@ -33,6 +34,7 @@ R2 uses capability milestones rather than treating its name as a sequence after 
 - [x] Editable table cells, table growth, image previews, sizing, wrapping, descriptions, and object deletion
 - [x] Shared pagination geometry for status, PDF, and print
 - [x] Stacked editable pages, page-aware text ranges and objects, thumbnail navigation, and active-page status
+- [x] Section-aware repeated headers and footers with phone dialog and desktop inspector editing
 - Drag handles, floating-object layout, and section-continuation rules
 
 ## Interchange

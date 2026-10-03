@@ -44,11 +44,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -362,6 +364,7 @@ private fun WordProcessorWorkspace(
     var showInspector by remember { mutableStateOf(true) }
     var zoom by remember { mutableStateOf(100) }
     var activePage by remember(document.id) { mutableStateOf(0) }
+    var showHeaderFooterEditor by remember(document.id) { mutableStateOf(false) }
     val editor = remember(document.id) { FlatTextEditorAdapter(document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)) }
     var editorValue by remember(document.id) { mutableStateOf(TextFieldValue(annotatedBody(editor.legacyBody(), editor.document))) }
     val focusRequester = remember { FocusRequester() }
@@ -429,6 +432,8 @@ private fun WordProcessorWorkspace(
                 onToggleList = ::toggleList,
                 onAdjustListLevel = ::adjustListLevel,
                 onPageBreak = { publish(editor.insertPageBreak(editorValue.selection.min, editorValue.selection.max)) },
+                onSectionBreak = { publish(editor.insertSectionBreak(editorValue.selection.min, editorValue.selection.max)) },
+                onEditHeaderFooter = { showHeaderFooterEditor = true },
                 onInsertTable = { publish(editor.insertTable(editorValue.selection.min, editorValue.selection.max)) },
                 onInsertImage = onChooseImage,
                 onLayout = ::updateLayout,
@@ -467,10 +472,28 @@ private fun WordProcessorWorkspace(
                         onActivePageChange = { activePage = it },
                     )
                 }
-                if (desktop && showInspector) InspectorPane(document, Modifier.width(280.dp).fillMaxHeight())
+                if (desktop && showInspector) InspectorPane(
+                    document = document,
+                    r2 = editor.document,
+                    activeSectionIndex = editor.activeSectionIndex,
+                    onHeaderFooterChange = { header, footer -> publish(editor.updateHeaderFooter(header, footer)) },
+                    modifier = Modifier.width(280.dp).fillMaxHeight(),
+                )
             }
             StatusBar(document, saving, zoom, activePage) { zoom = it }
         }
+    }
+    if (showHeaderFooterEditor) {
+        val section = editor.document.sections[editor.activeSectionIndex]
+        HeaderFooterEditorDialog(
+            initialHeader = sectionMarginText(section.header),
+            initialFooter = sectionMarginText(section.footer),
+            onDismiss = { showHeaderFooterEditor = false },
+            onSave = { header, footer ->
+                publish(editor.updateHeaderFooter(header, footer))
+                showHeaderFooterEditor = false
+            },
+        )
     }
 }
 
@@ -518,6 +541,8 @@ private fun Ribbon(
     onToggleList: (ListKind) -> Unit,
     onAdjustListLevel: (Int) -> Unit,
     onPageBreak: () -> Unit,
+    onSectionBreak: () -> Unit,
+    onEditHeaderFooter: () -> Unit,
     onInsertTable: () -> Unit,
     onInsertImage: () -> Unit,
     onLayout: (LayoutAction) -> Unit,
@@ -558,8 +583,9 @@ private fun Ribbon(
                     RibbonGroup("Styles") { RibbonCommand("Title", { onToggle(RichTextStyle.HeadingOne) }); RibbonCommand("Normal", {}) }
                 }
                 RibbonTab.Insert -> {
-                    RibbonGroup("Pages") { RibbonCommand("Page break", onPageBreak) }
+                    RibbonGroup("Pages") { RibbonCommand("Page break", onPageBreak); RibbonCommand("Section break", onSectionBreak) }
                     RibbonGroup("Content") { RibbonCommand("Table", onInsertTable); RibbonCommand("Picture", onInsertImage); RibbonCommand("Link", { onToggle(RichTextStyle.Link) }) }
+                    RibbonGroup("Page elements") { RibbonCommand("Header / footer", onEditHeaderFooter) }
                 }
                 RibbonTab.Layout -> RibbonGroup("Page setup") { RibbonCommand("Margins", { onLayout(LayoutAction.Margins) }); RibbonCommand("Orientation", { onLayout(LayoutAction.Orientation) }); RibbonCommand("Size", { onLayout(LayoutAction.Size) }); RibbonCommand("Columns", { onLayout(LayoutAction.Columns) }) }
                 RibbonTab.Review -> {
@@ -645,10 +671,18 @@ private fun NavigationPane(
 }
 
 @Composable
-private fun InspectorPane(document: Document, modifier: Modifier = Modifier) {
-    val r2 = document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)
-    val page = r2.sections.first().page
+private fun InspectorPane(
+    document: Document,
+    r2: WordProcessingDocument,
+    activeSectionIndex: Int,
+    onHeaderFooterChange: (String, String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val section = r2.sections[activeSectionIndex.coerceIn(r2.sections.indices)]
+    val page = section.page
     val blocks = r2.sections.flatMap { it.blocks }
+    val header = sectionMarginText(section.header)
+    val footer = sectionMarginText(section.footer)
     Surface(modifier, color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(18.dp)) {
             Text("Format", style = MaterialTheme.typography.titleMedium)
@@ -662,8 +696,46 @@ private fun InspectorPane(document: Document, modifier: Modifier = Modifier) {
                 "Pictures" to blocks.count { it is ImageBlock }.toString(),
                 "Words" to wordCount(document.body.text).toString(),
             ))
+            Text("Section ${activeSectionIndex + 1} of ${r2.sections.size}", fontWeight = FontWeight.SemiBold)
+            OutlinedTextField(
+                value = header,
+                onValueChange = { onHeaderFooterChange(it, footer) },
+                label = { Text("Header") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+            )
+            OutlinedTextField(
+                value = footer,
+                onValueChange = { onHeaderFooterChange(header, it) },
+                label = { Text("Footer") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+            )
         }
     }
+}
+
+@Composable
+private fun HeaderFooterEditorDialog(
+    initialHeader: String,
+    initialFooter: String,
+    onDismiss: () -> Unit,
+    onSave: (String, String) -> Unit,
+) {
+    var header by remember(initialHeader) { mutableStateOf(initialHeader) }
+    var footer by remember(initialFooter) { mutableStateOf(initialFooter) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Header and footer") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(header, { header = it }, label = { Text("Header") }, minLines = 2)
+                OutlinedTextField(footer, { footer = it }, label = { Text("Footer") }, minLines = 2)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(header, footer) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable
@@ -1051,6 +1123,9 @@ private fun StatusBar(document: Document, saving: Boolean, zoom: Int, activePage
         }
     }
 }
+
+private fun sectionMarginText(paragraphs: List<ParagraphBlock>): String =
+    paragraphs.joinToString("\n") { paragraph -> paragraph.runs.joinToString("") { it.text } }
 
 private fun wordCount(text: String): Int = text.trim().takeIf(String::isNotEmpty)?.split(Regex("\\s+"))?.size ?: 0
 

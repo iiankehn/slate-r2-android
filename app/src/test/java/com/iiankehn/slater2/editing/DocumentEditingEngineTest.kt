@@ -4,6 +4,8 @@ import com.iiankehn.slater2.model.CharacterStyle
 import com.iiankehn.slater2.model.DocumentSection
 import com.iiankehn.slater2.model.NamedParagraphStyle
 import com.iiankehn.slater2.model.ListKind
+import com.iiankehn.slater2.model.PageSetup
+import com.iiankehn.slater2.model.PageSize
 import com.iiankehn.slater2.model.ParagraphBlock
 import com.iiankehn.slater2.model.ParagraphStyle
 import com.iiankehn.slater2.model.TextRun
@@ -153,6 +155,44 @@ class DocumentEditingEngineTest {
         val nested = engine.execute(listed, DocumentCommand.HandleTab(outdent = false)).snapshot
         assertEquals(1, (nested.document.sections.single().blocks.single() as ParagraphBlock).style.list?.level)
         assertEquals(listOf("Item"), nested.paragraphTexts())
+    }
+
+    @Test
+    fun sectionBreakSplitsAtCaretAndHeaderFooterChangesAreUndoable() {
+        val session = DocumentEditorSession(snapshot("AlphaBeta").select(position(0, 5)), engine)
+
+        session.execute(DocumentCommand.InsertSectionBreak)
+        assertEquals(2, session.current.document.sections.size)
+        assertEquals("Alpha", (session.current.document.sections[0].blocks.single() as ParagraphBlock).runs.single().text)
+        assertEquals("Beta", (session.current.document.sections[1].blocks.single() as ParagraphBlock).runs.single().text)
+        assertTrue(session.current.document.sections[1].startsOnNewPage)
+        assertEquals(DocumentPosition(1, 0, 0), session.current.selection.focus)
+
+        session.execute(DocumentCommand.UpdateHeaderFooter("Report", "Confidential\nPage"))
+        assertEquals("Report", session.current.document.sections[1].header.single().runs.single().text)
+        assertEquals(2, session.current.document.sections[1].footer.size)
+        session.undo()
+        assertTrue(session.current.document.sections[1].header.isEmpty())
+    }
+
+    @Test
+    fun deletingSectionBoundaryJoinsTextAndUsesFollowingSectionSetup() {
+        val document = WordProcessingDocument(
+            "document",
+            "",
+            listOf(
+                DocumentSection(PageSetup(PageSize.Letter), listOf(ParagraphBlock("left", listOf(TextRun("Left"))))),
+                DocumentSection(PageSetup(PageSize.A4), listOf(ParagraphBlock("right", listOf(TextRun("Right")))), startsOnNewPage = true),
+            ),
+        )
+        val snapshot = EditorSnapshot(document, DocumentSelection(DocumentPosition(1, 0, 0)))
+
+        val joined = engine.execute(snapshot, DocumentCommand.DeleteBackward).snapshot
+
+        assertEquals(1, joined.document.sections.size)
+        assertEquals(PageSize.A4, joined.document.sections.single().page.size)
+        assertEquals("LeftRight", (joined.document.sections.single().blocks.single() as ParagraphBlock).runs.single().text)
+        assertEquals(DocumentPosition(0, 0, 4), joined.selection.focus)
     }
 
     @Test

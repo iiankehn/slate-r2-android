@@ -18,6 +18,7 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
     val document: WordProcessingDocument get() = session.current.document
     val canUndo: Boolean get() = session.canUndo
     val canRedo: Boolean get() = session.canRedo
+    val activeSectionIndex: Int get() = session.current.selection.focus.sectionIndex
 
     fun state(): FlatEditorState {
         index = FlatDocumentIndex(document)
@@ -77,6 +78,17 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
     fun insertPageBreak(start: Int, end: Int): FlatEditorState {
         session.updateSelection(DocumentSelection(index.position(start), index.position(end)))
         session.execute(DocumentCommand.InsertPageBreak)
+        return state()
+    }
+
+    fun insertSectionBreak(start: Int, end: Int): FlatEditorState {
+        session.updateSelection(DocumentSelection(index.position(start), index.position(end)))
+        session.execute(DocumentCommand.InsertSectionBreak)
+        return state()
+    }
+
+    fun updateHeaderFooter(headerText: String, footerText: String): FlatEditorState {
+        session.execute(DocumentCommand.UpdateHeaderFooter(headerText, footerText))
         return state()
     }
 

@@ -60,6 +60,8 @@ sealed interface DocumentCommand {
     data class HandleTab(val outdent: Boolean) : DocumentCommand
     data class UpdatePageSetup(val page: PageSetup) : DocumentCommand
     data object InsertPageBreak : DocumentCommand
+    data object InsertSectionBreak : DocumentCommand
+    data class UpdateHeaderFooter(val headerText: String, val footerText: String) : DocumentCommand
     data class InsertTable(val rows: Int = 2, val columns: Int = 2) : DocumentCommand
     data class InsertImage(val sourceUri: String, val description: String = "") : DocumentCommand
     data class UpdateTableCell(val tableId: String, val row: Int, val column: Int, val text: String) : DocumentCommand
@@ -113,6 +115,8 @@ class DocumentEditingEngine(
             is DocumentCommand.HandleTab -> handleTab(snapshot, command.outdent)
             is DocumentCommand.UpdatePageSetup -> updatePageSetup(snapshot, command.page)
             DocumentCommand.InsertPageBreak -> insertPageBreak(snapshot)
+            DocumentCommand.InsertSectionBreak -> insertSectionBreak(snapshot)
+            is DocumentCommand.UpdateHeaderFooter -> updateHeaderFooter(snapshot, command.headerText, command.footerText)
             is DocumentCommand.InsertTable -> insertBlock(snapshot, TableBlock(
                 id = "table-${UUID.randomUUID()}",
                 rows = List(command.rows.coerceIn(1, 100)) { TableRow(List(command.columns.coerceIn(1, 20)) { TableCell() }) },
@@ -137,6 +141,50 @@ class DocumentEditingEngine(
     private fun insertPageBreak(snapshot: EditorSnapshot): EditorSnapshot {
         val inserted = replaceSelection(snapshot, "\n")
         return applyParagraphStyle(inserted) { it.copy(pageBreakBefore = true) }
+    }
+
+    private fun insertSectionBreak(snapshot: EditorSnapshot): EditorSnapshot {
+        val working = if (snapshot.selection.isCollapsed) snapshot else replaceSelection(snapshot, "")
+        val position = working.selection.focus
+        val section = working.document.sections[position.sectionIndex]
+        val paragraph = section.blocks[position.blockIndex] as ParagraphBlock
+        val leading = paragraph.copy(runs = paragraph.runs.slice(0, position.offset).normalizedRuns())
+        val trailing = paragraph.copy(id = paragraphIdFactory(), runs = paragraph.runs.slice(position.offset, paragraph.textLength).normalizedRuns())
+        val first = section.copy(blocks = section.blocks.take(position.blockIndex) + leading)
+        val second = section.copy(
+            blocks = listOf(trailing) + section.blocks.drop(position.blockIndex + 1),
+            startsOnNewPage = true,
+        )
+        val sections = buildList {
+            addAll(working.document.sections.take(position.sectionIndex))
+            add(first)
+            add(second)
+            addAll(working.document.sections.drop(position.sectionIndex + 1))
+        }
+        return EditorSnapshot(
+            document = working.document.copy(sections = sections).touch(),
+            selection = DocumentSelection(DocumentPosition(position.sectionIndex + 1, 0, 0)),
+        )
+    }
+
+    private fun updateHeaderFooter(snapshot: EditorSnapshot, headerText: String, footerText: String): EditorSnapshot {
+        val index = snapshot.selection.focus.sectionIndex
+        val section = snapshot.document.sections[index]
+        fun marginParagraphs(text: String, existing: List<ParagraphBlock>, prefix: String): List<ParagraphBlock> =
+            if (text.isEmpty()) emptyList() else text.split('\n').mapIndexed { paragraphIndex, line ->
+                val previous = existing.getOrNull(paragraphIndex)
+                ParagraphBlock(
+                    id = previous?.id ?: "$prefix-${UUID.randomUUID()}",
+                    runs = listOf(TextRun(line, previous?.runs?.firstOrNull()?.style ?: CharacterStyle(fontSizePoints = 9f))),
+                    style = previous?.style ?: ParagraphStyle(spaceAfterPoints = 0f),
+                )
+            }
+        val updated = section.copy(
+            header = marginParagraphs(headerText, section.header, "header"),
+            footer = marginParagraphs(footerText, section.footer, "footer"),
+        )
+        if (updated == section) return snapshot
+        return snapshot.copy(document = snapshot.document.replaceSection(index, updated))
     }
 
     private fun adjustListLevel(snapshot: EditorSnapshot, delta: Int): EditorSnapshot {
@@ -301,9 +349,9 @@ class DocumentEditingEngine(
                 "",
             )
         }
-        if (position.blockIndex == 0) return snapshot
         val section = snapshot.document.sections[position.sectionIndex]
-        val previousIndex = section.blocks.indexOfPreviousParagraph(position.blockIndex) ?: return snapshot
+        val previousIndex = section.blocks.indexOfPreviousParagraph(position.blockIndex)
+            ?: return if (position.sectionIndex > 0) joinAdjacentSections(snapshot, position.sectionIndex - 1) else snapshot
         val previous = section.blocks[previousIndex] as ParagraphBlock
         return replaceSelection(
             snapshot.copy(
@@ -327,7 +375,8 @@ class DocumentEditingEngine(
                 "",
             )
         }
-        val nextIndex = section.blocks.indexOfNextParagraph(position.blockIndex) ?: return snapshot
+        val nextIndex = section.blocks.indexOfNextParagraph(position.blockIndex)
+            ?: return if (position.sectionIndex < snapshot.document.sections.lastIndex) joinAdjacentSections(snapshot, position.sectionIndex) else snapshot
         return replaceSelection(
             snapshot.copy(
                 selection = DocumentSelection(
@@ -336,6 +385,31 @@ class DocumentEditingEngine(
                 ),
             ),
             "",
+        )
+    }
+
+    private fun joinAdjacentSections(snapshot: EditorSnapshot, leftIndex: Int): EditorSnapshot {
+        if (leftIndex !in 0 until snapshot.document.sections.lastIndex) return snapshot
+        val left = snapshot.document.sections[leftIndex]
+        val right = snapshot.document.sections[leftIndex + 1]
+        val leftParagraphIndex = left.blocks.indexOfLast { it is ParagraphBlock }
+        val rightParagraphIndex = right.blocks.indexOfFirst { it is ParagraphBlock }
+        if (leftParagraphIndex != left.blocks.lastIndex || rightParagraphIndex != 0) return snapshot
+        val leftParagraph = left.blocks[leftParagraphIndex] as ParagraphBlock
+        val rightParagraph = right.blocks[rightParagraphIndex] as ParagraphBlock
+        val mergedParagraph = leftParagraph.copy(runs = (leftParagraph.runs + rightParagraph.runs).normalizedRuns())
+        val combined = right.copy(
+            blocks = left.blocks.dropLast(1) + mergedParagraph + right.blocks.drop(1),
+            startsOnNewPage = left.startsOnNewPage,
+        )
+        val sections = buildList {
+            addAll(snapshot.document.sections.take(leftIndex))
+            add(combined)
+            addAll(snapshot.document.sections.drop(leftIndex + 2))
+        }
+        return EditorSnapshot(
+            document = snapshot.document.copy(sections = sections).touch(),
+            selection = DocumentSelection(DocumentPosition(leftIndex, leftParagraphIndex, leftParagraph.textLength)),
         )
     }
 
