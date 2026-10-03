@@ -5,11 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f4f6fb">
   <meta name="description" content="Slate by CORE — two private, local-first Android writing products: R1 for fast notes and documents, R2 for full word processing.">
+  <link rel="canonical" href="https://slate.iiankehn.com/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Slate by CORE — R1 and R2">
+  <meta property="og:description" content="Two private, local-first Android writing products. R1 for fast notes and documents; R2 for full word processing.">
+  <meta property="og:url" content="https://slate.iiankehn.com/">
+  <meta property="og:image" content="https://raw.githubusercontent.com/iiankehn/slate-android/main/app/src/main/res/drawable-nodpi/ic_launcher_art.webp">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Slate by CORE — R1 and R2">
+  <meta name="twitter:description" content="Choose the private Android writing workspace that fits the work.">
   <title>Slate by CORE — R1 and R2</title>
   <link rel="icon" href="https://raw.githubusercontent.com/iiankehn/slate-android/main/app/src/main/res/drawable-nodpi/ic_launcher_art.webp">
+  <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/iiankehn/slate-android/main/app/src/main/res/drawable-nodpi/ic_launcher_art.webp">
   <link rel="stylesheet" href="docs/styles.css">
+  <script type="application/ld+json">
+    {"@context":"https://schema.org","@graph":[
+      {"@type":"SoftwareApplication","name":"Slate R1","applicationCategory":"ProductivityApplication","operatingSystem":"Android 12 or newer","url":"https://slate.iiankehn.com/#products","downloadUrl":"https://github.com/iiankehn/slate-android/releases/latest","codeRepository":"https://github.com/iiankehn/slate-android","description":"A private, local-first notes and document app for Android."},
+      {"@type":"SoftwareApplication","name":"Slate R2","applicationCategory":"ProductivityApplication","operatingSystem":"Android 12 or newer","url":"https://slate.iiankehn.com/#products","downloadUrl":"https://github.com/iiankehn/slate-r2-android/releases","codeRepository":"https://github.com/iiankehn/slate-r2-android","description":"A private, local-first full word processor for Android form factors."}
+    ]}
+  </script>
 </head>
 <body>
+  <a class="skip-link" href="#content">Skip to content</a>
   <header class="site-header">
     <a class="brand" href="#top" aria-label="Slate home">
       <img class="brand-icon" src="https://raw.githubusercontent.com/iiankehn/slate-android/main/app/src/main/res/drawable-nodpi/ic_launcher_art.webp" alt="" width="44" height="44">
@@ -28,7 +45,8 @@
     </nav>
   </header>
 
-  <main id="top">
+  <main id="content">
+    <span id="top" aria-hidden="true"></span>
     <section class="hero">
       <div class="hero-copy">
         <p class="eyebrow">SLATE · PRIVATE ANDROID WRITING</p>
@@ -38,6 +56,7 @@
           <a class="button primary" href="#products">Choose your Slate <span>↓</span></a>
           <a class="button secondary" href="#downloads">View downloads</a>
         </div>
+        <div class="platform-line"><span>Android 12+</span><span>Separate installs</span><span>Independent releases</span></div>
       </div>
       <div class="family-art" aria-label="Slate R1 and R2 product family">
         <article class="product-preview preview-r1">
@@ -77,7 +96,7 @@
         <article class="product-card r1-card">
           <div class="product-card-head">
             <img src="https://raw.githubusercontent.com/iiankehn/slate-android/main/app/src/main/res/drawable-nodpi/ic_launcher_art.webp" alt="Slate R1 icon">
-            <div><p class="product-code">SLATE R1</p><h3>Capture quickly.<br>Organize naturally.</h3></div>
+            <div><p class="product-code"><span class="product-token r1-token">R1</span> NOTES + DOCUMENTS</p><h3>Capture quickly.<br>Organize naturally.</h3></div>
           </div>
           <p class="product-summary">A focused notes and document workspace for everyday writing, organization, recovery, and file exchange.</p>
           <ul>
@@ -86,7 +105,7 @@
             <li>TXT, Markdown, DOCX, PDF, sharing, and printing</li>
             <li>Signed monthly releases with an in-app updater</li>
           </ul>
-          <div class="product-status"><span class="status-dot live"></span><strong data-product="r1" data-release-status>Signed release available</strong><small data-product="r1" data-release-version>R1 2026-09</small></div>
+          <div class="product-status" aria-live="polite"><span class="status-dot live"></span><strong data-product="r1" data-release-status>Signed release available</strong><small data-product="r1" data-release-version>R1 2026-09</small></div>
           <div class="card-actions">
             <a class="button product-button" data-product="r1" data-release-link href="https://github.com/iiankehn/slate-android/releases/download/r1-2026-09/Slate-R1-2026-09.apk">Download R1 <span>↓</span></a>
             <a class="repo-link" href="https://github.com/iiankehn/slate-android">R1 repository →</a>
@@ -96,7 +115,7 @@
         <article class="product-card r2-card">
           <div class="product-card-head">
             <img src="https://raw.githubusercontent.com/iiankehn/slate-r2-android/main/app/src/main/res/drawable-nodpi/ic_launcher_art.webp" alt="Slate R2 icon">
-            <div><p class="product-code">SLATE R2</p><h3>Build documents.<br>Control every page.</h3></div>
+            <div><p class="product-code"><span class="product-token r2-token">R2</span> WORD PROCESSOR</p><h3>Build documents.<br>Control every page.</h3></div>
           </div>
           <p class="product-summary">A full word processor for structured, page-aware documents across phones, tablets, foldables, and Googlebook Android.</p>
           <ul>
@@ -105,7 +124,7 @@
             <li>DOCX interchange, deterministic PDF, and printing</li>
             <li>Touch, stylus, mouse, trackpad, and keyboard layouts</li>
           </ul>
-          <div class="product-status"><span class="status-dot pending"></span><strong data-product="r2" data-release-status>Release candidate</strong><small data-product="r2" data-release-version>Signed release pending</small></div>
+          <div class="product-status" aria-live="polite"><span class="status-dot pending"></span><strong data-product="r2" data-release-status>Release candidate</strong><small data-product="r2" data-release-version>Signed release pending</small></div>
           <div class="card-actions">
             <a class="button product-button" data-product="r2" data-release-link href="https://github.com/iiankehn/slate-r2-android/releases">R2 downloads <span>→</span></a>
             <a class="repo-link" href="https://github.com/iiankehn/slate-r2-android">R2 repository →</a>
@@ -152,6 +171,7 @@
           <p data-product="r1" data-download-copy>Latest signed monthly APK with verified update metadata.</p>
           <a class="button primary" data-product="r1" data-release-link href="https://github.com/iiankehn/slate-android/releases/download/r1-2026-09/Slate-R1-2026-09.apk">Download R1</a>
           <a class="small-link" href="https://github.com/iiankehn/slate-android/releases">All R1 releases</a>
+          <a class="small-link" data-product="r1" data-checksum-link href="https://github.com/iiankehn/slate-android/releases/download/r1-2026-09/Slate-R1-2026-09.apk.sha256">Verify SHA-256</a>
         </article>
         <article>
           <span class="download-label">SLATE R2</span>
