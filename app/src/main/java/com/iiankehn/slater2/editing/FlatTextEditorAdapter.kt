@@ -57,6 +57,18 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
         return state()
     }
 
+    fun adjustListLevel(delta: Int, start: Int, end: Int): FlatEditorState {
+        session.updateSelection(DocumentSelection(index.position(start), index.position(end)))
+        session.execute(DocumentCommand.AdjustListLevel(delta))
+        return state()
+    }
+
+    fun handleTab(start: Int, end: Int, outdent: Boolean): FlatEditorState {
+        session.updateSelection(DocumentSelection(index.position(start), index.position(end)))
+        session.execute(DocumentCommand.HandleTab(outdent))
+        return state()
+    }
+
     fun updatePageSetup(page: PageSetup): FlatEditorState {
         session.execute(DocumentCommand.UpdatePageSetup(page))
         return state()

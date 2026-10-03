@@ -3,6 +3,7 @@ package com.iiankehn.slater2.editing
 import com.iiankehn.slater2.model.CharacterStyle
 import com.iiankehn.slater2.model.DocumentSection
 import com.iiankehn.slater2.model.NamedParagraphStyle
+import com.iiankehn.slater2.model.ListKind
 import com.iiankehn.slater2.model.ParagraphBlock
 import com.iiankehn.slater2.model.ParagraphStyle
 import com.iiankehn.slater2.model.TextRun
@@ -119,6 +120,39 @@ class DocumentEditingEngineTest {
         result.snapshot.document.sections.single().blocks.filterIsInstance<ParagraphBlock>().forEach {
             assertEquals(NamedParagraphStyle.Heading2, it.style.namedStyle)
         }
+    }
+
+    @Test
+    fun listLevelsAdjustAcrossSelectedParagraphsAndClampAtBounds() {
+        val listed = engine.execute(
+            snapshot("One", "Two").select(position(0, 0), position(1, 3)),
+            DocumentCommand.ToggleList(ListKind.Numbered),
+        ).snapshot
+
+        val nested = engine.execute(listed, DocumentCommand.AdjustListLevel(1)).snapshot
+        nested.document.sections.single().blocks.filterIsInstance<ParagraphBlock>().forEach {
+            assertEquals(1, it.style.list?.level)
+        }
+
+        val restored = engine.execute(nested, DocumentCommand.HandleTab(outdent = true)).snapshot
+        restored.document.sections.single().blocks.filterIsInstance<ParagraphBlock>().forEach {
+            assertEquals(0, it.style.list?.level)
+        }
+        assertFalse(engine.execute(restored, DocumentCommand.AdjustListLevel(-1)).changed)
+    }
+
+    @Test
+    fun tabInPlainParagraphInsertsTextWhileListTabChangesNesting() {
+        val plain = engine.execute(snapshot("Text").select(position(0, 0)), DocumentCommand.HandleTab(outdent = false))
+        assertEquals(listOf("\tText"), plain.snapshot.paragraphTexts())
+
+        val listed = engine.execute(
+            snapshot("Item").select(position(0, 0), position(0, 4)),
+            DocumentCommand.ToggleList(ListKind.Checklist),
+        ).snapshot
+        val nested = engine.execute(listed, DocumentCommand.HandleTab(outdent = false)).snapshot
+        assertEquals(1, (nested.document.sections.single().blocks.single() as ParagraphBlock).style.list?.level)
+        assertEquals(listOf("Item"), nested.paragraphTexts())
     }
 
     @Test

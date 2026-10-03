@@ -20,7 +20,8 @@ R2 uses capability milestones rather than treating its name as a sequence after 
 - [x] Durable recovery records and versioned R2 persistence with legacy migration
 - [x] IME-safe diff routing plus keyboard formatting and undo/redo
 - [x] Named style, list, page-break, and page-setup command routing
-- Tabs, advanced list levels, section-boundary editing, and object selections
+- [x] Tab insertion, Tab/Shift+Tab list nesting, checklist paragraphs, and multilevel markers
+- Section-boundary editing and object selections
 
 ## Layout engine
 

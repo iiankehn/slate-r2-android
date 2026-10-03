@@ -56,6 +56,8 @@ sealed interface DocumentCommand {
     data class ApplyParagraphStyle(val style: ParagraphStyle) : DocumentCommand
     data class ApplyNamedStyle(val style: NamedParagraphStyle) : DocumentCommand
     data class ToggleList(val kind: ListKind) : DocumentCommand
+    data class AdjustListLevel(val delta: Int) : DocumentCommand
+    data class HandleTab(val outdent: Boolean) : DocumentCommand
     data class UpdatePageSetup(val page: PageSetup) : DocumentCommand
     data object InsertPageBreak : DocumentCommand
     data class InsertTable(val rows: Int = 2, val columns: Int = 2) : DocumentCommand
@@ -107,6 +109,8 @@ class DocumentEditingEngine(
             is DocumentCommand.ToggleList -> applyParagraphStyle(snapshot) {
                 it.copy(list = if (it.list?.kind == command.kind) null else ListStyle(command.kind, it.list?.level ?: 0))
             }
+            is DocumentCommand.AdjustListLevel -> adjustListLevel(snapshot, command.delta)
+            is DocumentCommand.HandleTab -> handleTab(snapshot, command.outdent)
             is DocumentCommand.UpdatePageSetup -> updatePageSetup(snapshot, command.page)
             DocumentCommand.InsertPageBreak -> insertPageBreak(snapshot)
             is DocumentCommand.InsertTable -> insertBlock(snapshot, TableBlock(
@@ -133,6 +137,33 @@ class DocumentEditingEngine(
     private fun insertPageBreak(snapshot: EditorSnapshot): EditorSnapshot {
         val inserted = replaceSelection(snapshot, "\n")
         return applyParagraphStyle(inserted) { it.copy(pageBreakBefore = true) }
+    }
+
+    private fun adjustListLevel(snapshot: EditorSnapshot, delta: Int): EditorSnapshot {
+        if (delta == 0) return snapshot
+        val canChange = snapshot.document.sections.withIndex().any { (sectionIndex, section) ->
+            section.blocks.withIndex().any blockLoop@ { (blockIndex, block) ->
+                val level = (block as? ParagraphBlock)?.style?.list?.level ?: return@blockLoop false
+                snapshot.selection.includes(sectionIndex, blockIndex) && (level + delta).coerceIn(0, 8) != level
+            }
+        }
+        if (!canChange) return snapshot
+        return applyParagraphStyle(snapshot) { style ->
+            style.list?.let { list -> style.copy(list = list.copy(level = (list.level + delta).coerceIn(0, 8))) } ?: style
+        }
+    }
+
+    private fun handleTab(snapshot: EditorSnapshot, outdent: Boolean): EditorSnapshot {
+        val hasSelectedList = snapshot.document.sections.withIndex().any { (sectionIndex, section) ->
+            section.blocks.withIndex().any { (blockIndex, block) ->
+                block is ParagraphBlock && snapshot.selection.includes(sectionIndex, blockIndex) && block.style.list != null
+            }
+        }
+        return when {
+            hasSelectedList -> adjustListLevel(snapshot, if (outdent) -1 else 1)
+            outdent -> snapshot
+            else -> replaceSelection(snapshot, "\t")
+        }
     }
 
     private fun insertBlock(snapshot: EditorSnapshot, block: DocumentBlock): EditorSnapshot {

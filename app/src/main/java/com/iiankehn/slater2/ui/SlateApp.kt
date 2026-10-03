@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -72,6 +73,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -85,6 +87,8 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -106,6 +110,7 @@ import com.iiankehn.slater2.model.ListKind
 import com.iiankehn.slater2.model.PageMargins
 import com.iiankehn.slater2.model.PageOrientation
 import com.iiankehn.slater2.model.PageSize
+import com.iiankehn.slater2.model.ParagraphAlignment
 import com.iiankehn.slater2.model.ParagraphBlock
 import com.iiankehn.slater2.model.TableBlock
 import com.iiankehn.slater2.model.ImageBlock
@@ -358,12 +363,12 @@ private fun WordProcessorWorkspace(
     var zoom by remember { mutableStateOf(100) }
     var activePage by remember(document.id) { mutableStateOf(0) }
     val editor = remember(document.id) { FlatTextEditorAdapter(document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)) }
-    var editorValue by remember(document.id) { mutableStateOf(TextFieldValue(annotatedBody(editor.legacyBody()))) }
+    var editorValue by remember(document.id) { mutableStateOf(TextFieldValue(annotatedBody(editor.legacyBody(), editor.document))) }
     val focusRequester = remember { FocusRequester() }
     fun publish(state: com.iiankehn.slater2.editing.FlatEditorState) {
         val body = editor.legacyBody()
         val selection = TextRange(state.selectionStart, state.selectionEnd)
-        editorValue = TextFieldValue(annotatedBody(body), selection.coerceIn(0, body.text.length))
+        editorValue = TextFieldValue(annotatedBody(body, editor.document), selection.coerceIn(0, body.text.length))
         onChange(document.copy(body = body, wordProcessingDocument = editor.document.copy(title = document.title)))
     }
     fun toggle(style: RichTextStyle) {
@@ -387,6 +392,13 @@ private fun WordProcessorWorkspace(
     fun toggleList(kind: ListKind) {
         val range = selectionOrWordRange(editorValue.text, editorValue.selection)
         publish(editor.toggleList(kind, range.start, range.end))
+    }
+    fun adjustListLevel(delta: Int) {
+        val range = selectionOrWordRange(editorValue.text, editorValue.selection)
+        publish(editor.adjustListLevel(delta, range.start, range.end))
+    }
+    fun handleTab(outdent: Boolean) {
+        publish(editor.handleTab(editorValue.selection.min, editorValue.selection.max, outdent))
     }
     fun updateLayout(action: LayoutAction) {
         val page = editor.document.sections.first().page
@@ -415,6 +427,7 @@ private fun WordProcessorWorkspace(
                 tab = activeTab, compact = !tablet, document = document, selection = editorValue.selection,
                 onToggle = ::toggle, onInsert = ::insert, onNew = onNew, onOpen = onImport,
                 onToggleList = ::toggleList,
+                onAdjustListLevel = ::adjustListLevel,
                 onPageBreak = { publish(editor.insertPageBreak(editorValue.selection.min, editorValue.selection.max)) },
                 onInsertTable = { publish(editor.insertTable(editorValue.selection.min, editorValue.selection.max)) },
                 onInsertImage = onChooseImage,
@@ -443,6 +456,7 @@ private fun WordProcessorWorkspace(
                         onToggle = ::toggle,
                         onUndo = { publish(editor.undo()) },
                         onRedo = { publish(editor.redo()) },
+                        onTab = ::handleTab,
                         onUpdateTableCell = { id, row, column, text -> publish(editor.updateTableCell(id, row, column, text)) },
                         onResizeTable = { id, rows, columns -> publish(editor.resizeTable(id, rows, columns)) },
                         onUpdateImage = { id, description, width, height, wrapping ->
@@ -502,6 +516,7 @@ private fun Ribbon(
     onToggle: (RichTextStyle) -> Unit,
     onInsert: (String) -> Unit,
     onToggleList: (ListKind) -> Unit,
+    onAdjustListLevel: (Int) -> Unit,
     onPageBreak: () -> Unit,
     onInsertTable: () -> Unit,
     onInsertImage: () -> Unit,
@@ -532,7 +547,14 @@ private fun Ribbon(
                         RibbonCommand("I", { onToggle(RichTextStyle.Italic) }, document.body.hasStyle(RichTextStyle.Italic, selection.min, selection.max), italic = true)
                         RibbonCommand("U", { onToggle(RichTextStyle.Underline) }, document.body.hasStyle(RichTextStyle.Underline, selection.min, selection.max), underline = true)
                     }
-                    RibbonGroup("Paragraph") { RibbonCommand("Bullets", { onToggleList(ListKind.Bulleted) }); RibbonCommand("Numbering", { onToggleList(ListKind.Numbered) }); RibbonCommand("Quote", { onToggle(RichTextStyle.Quote) }) }
+                    RibbonGroup("Paragraph") {
+                        RibbonCommand("Bullets", { onToggleList(ListKind.Bulleted) })
+                        RibbonCommand("Numbering", { onToggleList(ListKind.Numbered) })
+                        RibbonCommand("Checklist", { onToggleList(ListKind.Checklist) })
+                        RibbonCommand("Outdent", { onAdjustListLevel(-1) })
+                        RibbonCommand("Indent", { onAdjustListLevel(1) })
+                        RibbonCommand("Quote", { onToggle(RichTextStyle.Quote) })
+                    }
                     RibbonGroup("Styles") { RibbonCommand("Title", { onToggle(RichTextStyle.HeadingOne) }); RibbonCommand("Normal", {}) }
                 }
                 RibbonTab.Insert -> {
@@ -671,6 +693,7 @@ private fun DocumentCanvas(
     onToggle: (RichTextStyle) -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    onTab: (Boolean) -> Unit,
     onUpdateTableCell: (String, Int, Int, String) -> Unit,
     onResizeTable: (String, Int, Int) -> Unit,
     onUpdateImage: (String, String, Float?, Float?, ImageWrapping) -> Unit,
@@ -719,17 +742,18 @@ private fun DocumentCanvas(
                     border = if (selected) BorderStroke(2.dp, CoreBlue) else null,
                     shadowElevation = if (selected) 7.dp else 4.dp,
                 ) {
-                    Column(Modifier.fillMaxSize()) {
-                        StructuredObjects(
-                            document = document,
-                            layout = layout,
-                            pageIndex = pageIndex,
-                            onUpdateTableCell = onUpdateTableCell,
-                            onResizeTable = onResizeTable,
-                            onUpdateImage = onUpdateImage,
-                            onDeleteObject = onDeleteObject,
-                        )
-                        BasicTextField(
+                    Box(Modifier.fillMaxSize()) {
+                        Column(Modifier.fillMaxSize()) {
+                            StructuredObjects(
+                                document = document,
+                                layout = layout,
+                                pageIndex = pageIndex,
+                                onUpdateTableCell = onUpdateTableCell,
+                                onResizeTable = onResizeTable,
+                                onUpdateImage = onUpdateImage,
+                                onDeleteObject = onDeleteObject,
+                            )
+                            BasicTextField(
                             value = pageValue,
                             onValueChange = { changed ->
                                 val combined = value.text.replaceRange(slice.start, slice.end, changed.text)
@@ -750,7 +774,12 @@ private fun DocumentCanvas(
                                 .padding(horizontal = (72 * zoom / 100).dp, vertical = (34 * zoom / 100).dp)
                                 .then(if (selected) Modifier.focusRequester(focusRequester) else Modifier)
                                 .onPreviewKeyEvent { event ->
-                                    if (event.type != KeyEventType.KeyDown || !event.isCtrlPressed) return@onPreviewKeyEvent false
+                                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                                    if (event.key == Key.Tab) {
+                                        onTab(event.isShiftPressed)
+                                        return@onPreviewKeyEvent true
+                                    }
+                                    if (!event.isCtrlPressed) return@onPreviewKeyEvent false
                                     when (event.key) {
                                         Key.B -> { onToggle(RichTextStyle.Bold); true }
                                         Key.I -> { onToggle(RichTextStyle.Italic); true }
@@ -769,7 +798,9 @@ private fun DocumentCanvas(
                                 )
                                 inner()
                             },
-                        )
+                            )
+                        }
+                        ListMarkerOverlay(document, layout, pageIndex)
                     }
                 }
                 Text(
@@ -805,6 +836,59 @@ private fun StructuredObjects(
             else -> Unit
         }
         }
+    }
+}
+
+internal data class ParagraphListMarker(val text: String, val level: Int)
+
+internal fun paragraphListMarkers(document: WordProcessingDocument): Map<String, ParagraphListMarker> = buildMap {
+    val counters = IntArray(9)
+    val kinds = arrayOfNulls<ListKind>(9)
+    document.sections.forEach { section ->
+        section.blocks.filterIsInstance<ParagraphBlock>().forEach paragraphLoop@ { paragraph ->
+            val list = paragraph.style.list
+            if (list == null) {
+                counters.fill(0)
+                kinds.fill(null)
+                return@paragraphLoop
+            }
+            ((list.level + 1)..8).forEach { level -> counters[level] = 0; kinds[level] = null }
+            val marker = when (list.kind) {
+                ListKind.Bulleted -> listOf("•", "◦", "▪")[list.level % 3]
+                ListKind.Checklist -> "☐"
+                ListKind.Numbered -> {
+                    counters[list.level] = if (kinds[list.level] == ListKind.Numbered) counters[list.level] + 1 else list.startAt
+                    "${counters[list.level]}."
+                }
+            }
+            kinds[list.level] = list.kind
+            put(paragraph.id, ParagraphListMarker(marker, list.level))
+        }
+    }
+}
+
+@Composable
+private fun ListMarkerOverlay(document: WordProcessingDocument, layout: DocumentLayout, pageIndex: Int) {
+    val markers = remember(document) { paragraphListMarkers(document) }
+    if (markers.isEmpty()) return
+    val page = layout.pages[pageIndex]
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val scale = maxWidth.value / page.setup.widthPoints
+        page.columns.flatMap { it.fragments }
+            .filter { it.kind == FragmentKind.Paragraph && !it.continuedFromPrevious && it.blockId in markers }
+            .distinctBy { it.blockId }
+            .forEach { fragment ->
+                val marker = markers.getValue(fragment.blockId)
+                val x = ((fragment.bounds.left + marker.level * 18f - 22f) * scale).coerceAtLeast(4f)
+                val y = (fragment.bounds.top * scale).coerceAtLeast(0f)
+                Text(
+                    marker.text,
+                    modifier = Modifier.offset(x.dp, y.dp),
+                    color = PaperText,
+                    fontSize = (11f * scale).coerceIn(9f, 18f).sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
     }
 }
 
@@ -970,7 +1054,7 @@ private fun StatusBar(document: Document, saving: Boolean, zoom: Int, activePage
 
 private fun wordCount(text: String): Int = text.trim().takeIf(String::isNotEmpty)?.split(Regex("\\s+"))?.size ?: 0
 
-private fun annotatedBody(body: RichTextDocument): AnnotatedString = AnnotatedString.Builder(body.text).apply {
+private fun annotatedBody(body: RichTextDocument, document: WordProcessingDocument): AnnotatedString = AnnotatedString.Builder(body.text).apply {
     body.normalized().ranges.forEach { range ->
         val style = when (range.style) {
             RichTextStyle.Bold -> SpanStyle(fontWeight = FontWeight.Bold)
@@ -983,6 +1067,34 @@ private fun annotatedBody(body: RichTextDocument): AnnotatedString = AnnotatedSt
             RichTextStyle.Table -> SpanStyle(fontWeight = FontWeight.Medium)
         }
         addStyle(style, range.start, range.end)
+    }
+    var cursor = 0
+    var hasParagraph = false
+    document.sections.forEach { section ->
+        section.blocks.filterIsInstance<ParagraphBlock>().forEach { paragraph ->
+            if (hasParagraph) cursor += 1
+            val start = cursor
+            cursor = (cursor + paragraph.runs.sumOf { it.text.length }).coerceAtMost(body.text.length)
+            val listIndent = paragraph.style.list?.let { (it.level + 1) * 18f } ?: 0f
+            val restIndent = paragraph.style.startIndentPoints + listIndent
+            addStyle(
+                androidx.compose.ui.text.ParagraphStyle(
+                    textAlign = when (paragraph.style.alignment) {
+                        ParagraphAlignment.Start -> TextAlign.Start
+                        ParagraphAlignment.Center -> TextAlign.Center
+                        ParagraphAlignment.End -> TextAlign.End
+                        ParagraphAlignment.Justify -> TextAlign.Justify
+                    },
+                    textIndent = TextIndent(
+                        firstLine = (restIndent + paragraph.style.firstLineIndentPoints).sp,
+                        restLine = restIndent.sp,
+                    ),
+                ),
+                start,
+                cursor,
+            )
+            hasParagraph = true
+        }
     }
 }.toAnnotatedString()
 

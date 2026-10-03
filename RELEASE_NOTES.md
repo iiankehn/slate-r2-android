@@ -17,6 +17,7 @@ Slate R2 is in active foundation development and has not published an official r
 - Added real picture previews with size, wrapping, and accessibility-description controls.
 - Added deterministic page thumbnails, page-aware canvas proportions, and live object counts in the inspector.
 - Replaced the single-page editor with stacked editable page surfaces using deterministic layout ranges, page-aware object placement, clickable thumbnails, and active-page status.
+- Added visible bulleted, numbered, and checklist markers with nine nesting levels, ribbon indent/outdent commands, paragraph indentation, and Tab/Shift+Tab keyboard behavior.
 - Added text, Markdown, and basic DOCX import; text, Markdown, DOCX, and PDF export; share and print flows.
 - Added adaptive phone, tablet, foldable, and Googlebook workspace policies plus keyboard shortcuts.
 - Added CI checks for unit tests, lint, APK assembly, and ARM64/x86_64 native dependency coverage.

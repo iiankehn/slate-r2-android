@@ -9,9 +9,9 @@ Status values describe the development tree, not a public release.
 | Page setup | Interactive size, margins, orientation, and 1–4 columns | Custom sizes and section continuation |
 | Editing commands | Multi-paragraph replace/delete/format commands implemented | Tables, objects, and section-boundary editing |
 | Selection and history | UI-routed logical selections with transactional undo/redo | Object and cross-section selections |
-| Paragraphs and character runs | IME diffs route through the R2 engine | Tabs, language runs, and advanced typography |
+| Paragraphs and character runs | IME diffs route through the R2 engine; plain-text tabs and paragraph alignment render in the page editor | Tab stops, language runs, and advanced typography |
 | Named styles | Heading, quote, and normal command application | Style gallery, inheritance, document themes |
-| Lists | Bulleted and numbered list commands | Visible markers, multilevel lists, checklists |
+| Lists | Visible bullet, numbered, and checklist markers; nine nesting levels; ribbon indent/outdent; Tab/Shift+Tab nesting; undo/redo | Checked-state interaction, custom numbering formats, and DOCX numbering-definition fidelity |
 | Tables | Structured insertion, direct cell editing, row/column growth, deletion, undo/redo, DOCX import/export, layout measurement | Row/column removal, merge, repeat headers, resize handles, keyboard navigation |
 | Images | Android document-provider insertion, durable URI permission, inline preview, resizing, wrapping modes, accessibility descriptions, deletion, undo/redo | Crop, drag positioning, and true floating-object layout |
 | Pagination | Deterministic stacked editable pages, page-aware text ranges and objects, clickable thumbnails, columns, headers/footers, tables, and inline images | Precise floating-object placement and section continuation |
