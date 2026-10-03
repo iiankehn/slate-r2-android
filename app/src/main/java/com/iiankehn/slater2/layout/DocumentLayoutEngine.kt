@@ -9,6 +9,7 @@ import com.iiankehn.slater2.model.ParagraphBlock
 import com.iiankehn.slater2.model.TableBlock
 import com.iiankehn.slater2.model.TextRun
 import com.iiankehn.slater2.model.WordProcessingDocument
+import com.iiankehn.slater2.model.SectionStart
 import kotlin.math.max
 
 data class PointRect(val left: Float, val top: Float, val right: Float, val bottom: Float) {
@@ -240,7 +241,11 @@ class DocumentLayoutEngine(
 
         init {
             val previous = pages.lastOrNull()
-            page = if (previous == null || section.startsOnNewPage || previous.setup != section.page) createPage() else previous
+            page = when {
+                previous == null -> createPage()
+                section.start == SectionStart.Continuous && previous.setup == section.page -> previous
+                else -> createSectionStartPage()
+            }
             columnIndex = if (page === previous) previous.columns.indexOfLast { it.fragments.isNotEmpty() }.coerceAtLeast(0) else 0
             y = page.columns[columnIndex].fragments.lastOrNull()?.bounds?.bottom ?: page.columns[columnIndex].bounds.top
         }
@@ -275,6 +280,17 @@ class DocumentLayoutEngine(
             val created = MutablePage(pages.size, sectionIndex, section, createColumns(section.page))
             pages += created
             return created
+        }
+
+        private fun createSectionStartPage(): MutablePage {
+            val nextPageNumber = pages.size + 1
+            val needsBlank = when (section.start) {
+                SectionStart.OddPage -> nextPageNumber % 2 == 0
+                SectionStart.EvenPage -> nextPageNumber % 2 != 0
+                else -> false
+            }
+            if (needsBlank) pages += MutablePage(pages.size, sectionIndex, section, createColumns(section.page))
+            return createPage()
         }
     }
 

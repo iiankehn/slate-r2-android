@@ -9,7 +9,12 @@ internal data class ParsedDocx(val document: WordProcessingDocument, val warning
 
 /** Bounded OOXML reader for Word content that Slate can represent without executing package data. */
 internal object DocxImporter {
-    fun parse(documentXml: ByteArray, relationshipsXml: ByteArray?, fallbackTitle: String): ParsedDocx {
+    fun parse(
+        documentXml: ByteArray,
+        relationshipsXml: ByteArray?,
+        fallbackTitle: String,
+        marginParts: Map<String, ByteArray> = emptyMap(),
+    ): ParsedDocx {
         val root = parseXml(documentXml)
         val relationships = relationshipsXml?.let { parseRelationships(it) }.orEmpty()
         val body = root.elements().firstOrNull { it.localName == "body" }
@@ -26,19 +31,45 @@ internal object DocxImporter {
             }
         }
         val blocks = if (parsedBlocks.any { it is ParagraphBlock }) parsedBlocks else parsedBlocks + ParagraphBlock("paragraph-${blockNumber++}")
-        val setup = body.descendants("sectPr").lastOrNull()?.let(::parsePageSetup) ?: PageSetup()
+        val sectionProperties = body.descendants("sectPr").lastOrNull()
+        val setup = sectionProperties?.let(::parsePageSetup) ?: PageSetup()
+        fun marginBlocks(kind: String): List<ParagraphBlock> {
+            val reference = sectionProperties?.child("${kind}Reference") ?: return emptyList()
+            val relationshipId = reference.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships", "id")
+                .ifBlank { reference.getAttribute("r:id") }
+            val target = relationships[relationshipId] ?: return emptyList()
+            val path = if (target.startsWith("word/")) target else "word/${target.removePrefix("/")}"
+            val xml = marginParts[path] ?: return emptyList()
+            return parseXml(xml).elements("p").mapIndexed { index, paragraph ->
+                parseParagraph(paragraph, "$kind-$index", relationships)
+            }
+        }
+        val header = marginBlocks("header")
+        val footer = marginBlocks("footer")
         val firstText = blocks.filterIsInstance<ParagraphBlock>().firstOrNull { it.runs.any { run -> run.text.isNotBlank() } }
             ?.runs?.joinToString("") { it.text }?.trim()
         val title = firstText?.takeIf { it.length <= 160 } ?: fallbackTitle
         val document = WordProcessingDocument(
             id = "imported-docx",
             title = title,
-            sections = listOf(DocumentSection(page = setup, blocks = blocks)),
+            sections = listOf(DocumentSection(
+                page = setup,
+                blocks = blocks,
+                header = header,
+                footer = footer,
+                start = when (sectionProperties?.child("type")?.attribute("val")) {
+                    "nextPage" -> SectionStart.NextPage
+                    "oddPage" -> SectionStart.OddPage
+                    "evenPage" -> SectionStart.EvenPage
+                    else -> SectionStart.Continuous
+                },
+            )),
         )
         val warnings = buildList {
             if (containsDrawing) add("Embedded drawings and pictures were detected but require placement review.")
-            if (relationships.values.any { it.contains("header", true) || it.contains("footer", true) }) {
-                add("Word headers and footers are not imported yet.")
+            if ((header.isEmpty() && relationships.values.any { it.contains("header", true) }) ||
+                (footer.isEmpty() && relationships.values.any { it.contains("footer", true) })) {
+                add("Some Word headers or footers could not be imported and require review.")
             }
             add("Review imported pagination because Word font metrics may differ from Slate.")
         }
@@ -139,6 +170,7 @@ internal object DocxImporter {
         val landscape = size?.attribute("orient") == "landscape" || width > height
         if (landscape && width > height) { val swap = width; width = height; height = swap }
         val pageSize = PageSize.entries.minBy { kotlin.math.abs(it.widthPoints - width) + kotlin.math.abs(it.heightPoints - height) }
+        val custom = kotlin.math.abs(pageSize.widthPoints - width) + kotlin.math.abs(pageSize.heightPoints - height) > 4f
         val margins = element.child("pgMar")
         val columns = element.child("cols")
         return PageSetup(
@@ -147,6 +179,8 @@ internal object DocxImporter {
             margins = PageMargins(margins.twips("top", 72f), margins.twips("right", 72f), margins.twips("bottom", 72f), margins.twips("left", 72f)),
             columns = columns?.attribute("num")?.toIntOrNull()?.coerceIn(1, 4) ?: 1,
             columnSpacingPoints = columns.twips("space", 18f),
+            customWidthPoints = width.takeIf { custom },
+            customHeightPoints = height.takeIf { custom },
         )
     }
 

@@ -10,7 +10,7 @@ import java.util.Base64
 /** Versioned, bounded storage format for the complete R2 document model. */
 object R2DocumentCodec {
     private const val MAGIC = 0x534C5232
-    private const val VERSION = 1
+    private const val VERSION = 2
     private const val MAX_PAYLOAD_BYTES = 32 * 1024 * 1024
     private const val MAX_COLLECTION_SIZE = 100_000
     private const val MAX_STRING_BYTES = 8 * 1024 * 1024
@@ -37,12 +37,12 @@ object R2DocumentCodec {
         return DataInputStream(ByteArrayInputStream(bytes)).use { data ->
             require(data.readInt() == MAGIC) { "R2 document has an invalid signature." }
             val version = data.readInt()
-            require(version == VERSION) { "Unsupported R2 document version: $version." }
+            require(version in 1..VERSION) { "Unsupported R2 document version: $version." }
             val document = WordProcessingDocument(
                 id = data.readString(),
                 title = data.readString(),
                 metadata = data.readMetadata(),
-                sections = data.readList { readSection() },
+                sections = data.readList { readSection(version) },
             )
             require(data.available() == 0) { "R2 document contains unexpected trailing data." }
             document
@@ -65,24 +65,33 @@ object R2DocumentCodec {
         writeList(value.blocks) { writeBlock(it) }
         writeList(value.header) { writeParagraph(it) }
         writeList(value.footer) { writeParagraph(it) }
-        writeBoolean(value.startsOnNewPage)
+        writeInt(value.start.ordinal)
     }
 
-    private fun DataInputStream.readSection() = DocumentSection(
-        page = readPage(), blocks = readList { readBlock() }, header = readList { readParagraph() },
-        footer = readList { readParagraph() }, startsOnNewPage = readBoolean(),
+    private fun DataInputStream.readSection(version: Int) = DocumentSection(
+        page = readPage(version), blocks = readList { readBlock() }, header = readList { readParagraph() },
+        footer = readList { readParagraph() },
+        start = if (version == 1) {
+            if (readBoolean()) SectionStart.NextPage else SectionStart.Continuous
+        } else readEnum(),
     )
 
     private fun DataOutputStream.writePage(value: PageSetup) {
         writeInt(value.size.ordinal); writeInt(value.orientation.ordinal)
         with(value.margins) { writeFloat(topPoints); writeFloat(endPoints); writeFloat(bottomPoints); writeFloat(startPoints) }
         writeInt(value.columns); writeFloat(value.columnSpacingPoints)
+        writeNullableFloat(value.customWidthPoints); writeNullableFloat(value.customHeightPoints)
     }
 
-    private fun DataInputStream.readPage(): PageSetup {
+    private fun DataInputStream.readPage(version: Int = VERSION): PageSetup {
         val size = readEnum<PageSize>(); val orientation = readEnum<PageOrientation>()
         val margins = PageMargins(readFloat(), readFloat(), readFloat(), readFloat())
-        return PageSetup(size, orientation, margins, readInt(), readFloat())
+        val columns = readInt(); val spacing = readFloat()
+        return PageSetup(
+            size, orientation, margins, columns, spacing,
+            if (version >= 2) readNullableFloat() else null,
+            if (version >= 2) readNullableFloat() else null,
+        )
     }
 
     private fun DataOutputStream.writeBlock(value: DocumentBlock) = when (value) {

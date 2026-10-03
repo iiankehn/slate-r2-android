@@ -15,6 +15,7 @@ import com.iiankehn.slater2.model.ImageWrapping
 import com.iiankehn.slater2.model.ParagraphBlock
 import com.iiankehn.slater2.model.ParagraphStyle
 import com.iiankehn.slater2.model.TextRun
+import com.iiankehn.slater2.model.SectionStart
 import com.iiankehn.slater2.model.WordProcessingDocument
 import java.util.UUID
 
@@ -61,11 +62,15 @@ sealed interface DocumentCommand {
     data class UpdatePageSetup(val page: PageSetup) : DocumentCommand
     data object InsertPageBreak : DocumentCommand
     data object InsertSectionBreak : DocumentCommand
+    data class InsertSectionBreakAs(val start: SectionStart) : DocumentCommand
     data class UpdateHeaderFooter(val headerText: String, val footerText: String) : DocumentCommand
     data class InsertTable(val rows: Int = 2, val columns: Int = 2) : DocumentCommand
     data class InsertImage(val sourceUri: String, val description: String = "") : DocumentCommand
     data class UpdateTableCell(val tableId: String, val row: Int, val column: Int, val text: String) : DocumentCommand
     data class ResizeTable(val tableId: String, val rows: Int, val columns: Int) : DocumentCommand
+    data class DeleteTableRow(val tableId: String, val row: Int) : DocumentCommand
+    data class DeleteTableColumn(val tableId: String, val column: Int) : DocumentCommand
+    data class SetTableHeaderRows(val tableId: String, val count: Int) : DocumentCommand
     data class UpdateImage(
         val imageId: String,
         val description: String,
@@ -116,7 +121,8 @@ class DocumentEditingEngine(
             is DocumentCommand.HandleTab -> handleTab(snapshot, command.outdent)
             is DocumentCommand.UpdatePageSetup -> updatePageSetup(snapshot, command.page)
             DocumentCommand.InsertPageBreak -> insertPageBreak(snapshot)
-            DocumentCommand.InsertSectionBreak -> insertSectionBreak(snapshot)
+            DocumentCommand.InsertSectionBreak -> insertSectionBreak(snapshot, SectionStart.NextPage)
+            is DocumentCommand.InsertSectionBreakAs -> insertSectionBreak(snapshot, command.start)
             is DocumentCommand.UpdateHeaderFooter -> updateHeaderFooter(snapshot, command.headerText, command.footerText)
             is DocumentCommand.InsertTable -> insertBlock(snapshot, TableBlock(
                 id = "table-${UUID.randomUUID()}",
@@ -127,6 +133,9 @@ class DocumentEditingEngine(
             ))
             is DocumentCommand.UpdateTableCell -> updateTableCell(snapshot, command)
             is DocumentCommand.ResizeTable -> resizeTable(snapshot, command)
+            is DocumentCommand.DeleteTableRow -> deleteTableRow(snapshot, command)
+            is DocumentCommand.DeleteTableColumn -> deleteTableColumn(snapshot, command)
+            is DocumentCommand.SetTableHeaderRows -> setTableHeaderRows(snapshot, command)
             is DocumentCommand.UpdateImage -> updateImage(snapshot, command)
             is DocumentCommand.DeleteObject -> deleteObject(snapshot, command.objectId)
         }
@@ -144,7 +153,7 @@ class DocumentEditingEngine(
         return applyParagraphStyle(inserted) { it.copy(pageBreakBefore = true) }
     }
 
-    private fun insertSectionBreak(snapshot: EditorSnapshot): EditorSnapshot {
+    private fun insertSectionBreak(snapshot: EditorSnapshot, start: SectionStart): EditorSnapshot {
         val working = if (snapshot.selection.isCollapsed) snapshot else replaceSelection(snapshot, "")
         val position = working.selection.focus
         val section = working.document.sections[position.sectionIndex]
@@ -154,7 +163,7 @@ class DocumentEditingEngine(
         val first = section.copy(blocks = section.blocks.take(position.blockIndex) + leading)
         val second = section.copy(
             blocks = listOf(trailing) + section.blocks.drop(position.blockIndex + 1),
-            startsOnNewPage = true,
+            start = start,
         )
         val sections = buildList {
             addAll(working.document.sections.take(position.sectionIndex))
@@ -270,6 +279,41 @@ class DocumentEditingEngine(
         )
     }
 
+    private fun deleteTableRow(
+        snapshot: EditorSnapshot,
+        command: DocumentCommand.DeleteTableRow,
+    ): EditorSnapshot = snapshot.updateObject(command.tableId) { block ->
+        val table = block as? TableBlock ?: return@updateObject block
+        if (table.rows.size == 1 || command.row !in table.rows.indices) return@updateObject block
+        table.copy(
+            rows = table.rows.filterIndexed { index, _ -> index != command.row },
+            headerRowCount = when {
+                command.row >= table.headerRowCount -> table.headerRowCount
+                else -> (table.headerRowCount - 1).coerceAtLeast(0)
+            },
+        )
+    }
+
+    private fun deleteTableColumn(
+        snapshot: EditorSnapshot,
+        command: DocumentCommand.DeleteTableColumn,
+    ): EditorSnapshot = snapshot.updateObject(command.tableId) { block ->
+        val table = block as? TableBlock ?: return@updateObject block
+        val columns = table.rows.first().cells.size
+        if (columns == 1 || command.column !in 0 until columns) return@updateObject block
+        table.copy(rows = table.rows.map { row ->
+            row.copy(cells = row.cells.filterIndexed { index, _ -> index != command.column })
+        })
+    }
+
+    private fun setTableHeaderRows(
+        snapshot: EditorSnapshot,
+        command: DocumentCommand.SetTableHeaderRows,
+    ): EditorSnapshot = snapshot.updateObject(command.tableId) { block ->
+        val table = block as? TableBlock ?: return@updateObject block
+        table.copy(headerRowCount = command.count.coerceIn(0, table.rows.size))
+    }
+
     private fun updateImage(
         snapshot: EditorSnapshot,
         command: DocumentCommand.UpdateImage,
@@ -299,8 +343,8 @@ class DocumentEditingEngine(
 
     private fun replaceSelection(snapshot: EditorSnapshot, insertedText: String): EditorSnapshot {
         val selection = snapshot.selection
-        require(selection.start.sectionIndex == selection.end.sectionIndex) {
-            "Text replacement across section boundaries is not implemented yet."
+        if (selection.start.sectionIndex != selection.end.sectionIndex) {
+            return replaceAcrossSections(snapshot, insertedText)
         }
         val sectionIndex = selection.start.sectionIndex
         val section = snapshot.document.sections[sectionIndex]
@@ -336,6 +380,52 @@ class DocumentEditingEngine(
         )
         return EditorSnapshot(
             document = snapshot.document.replaceSection(sectionIndex, section.copy(blocks = updatedBlocks)),
+            selection = DocumentSelection(caret),
+        )
+    }
+
+    private fun replaceAcrossSections(snapshot: EditorSnapshot, insertedText: String): EditorSnapshot {
+        val selection = snapshot.selection
+        val start = selection.start
+        val end = selection.end
+        val startSection = snapshot.document.sections[start.sectionIndex]
+        val endSection = snapshot.document.sections[end.sectionIndex]
+        val startBlock = startSection.blocks[start.blockIndex] as ParagraphBlock
+        val endBlock = endSection.blocks[end.blockIndex] as ParagraphBlock
+        val prefix = startBlock.runs.slice(0, start.offset)
+        val suffix = endBlock.runs.slice(end.offset, endBlock.textLength)
+        val insertionStyle = prefix.lastOrNull()?.style
+            ?: startBlock.runs.styleAt(start.offset)
+            ?: CharacterStyle()
+        val lines = insertedText.split('\n')
+        val replacement = lines.mapIndexed { index, line ->
+            val runs = buildList {
+                if (index == 0) addAll(prefix)
+                if (line.isNotEmpty()) add(TextRun(line, insertionStyle))
+                if (index == lines.lastIndex) addAll(suffix)
+            }.normalizedRuns()
+            ParagraphBlock(
+                id = if (index == 0) startBlock.id else paragraphIdFactory(),
+                runs = runs,
+                style = if (index == lines.lastIndex) endBlock.style else startBlock.style,
+            )
+        }
+        val combined = endSection.copy(
+            blocks = startSection.blocks.take(start.blockIndex) + replacement + endSection.blocks.drop(end.blockIndex + 1),
+            start = startSection.start,
+        )
+        val sections = buildList {
+            addAll(snapshot.document.sections.take(start.sectionIndex))
+            add(combined)
+            addAll(snapshot.document.sections.drop(end.sectionIndex + 1))
+        }
+        val caret = DocumentPosition(
+            sectionIndex = start.sectionIndex,
+            blockIndex = start.blockIndex + lines.lastIndex,
+            offset = if (lines.size == 1) start.offset + insertedText.length else lines.last().length,
+        )
+        return EditorSnapshot(
+            document = snapshot.document.copy(sections = sections).touch(),
             selection = DocumentSelection(caret),
         )
     }
@@ -405,7 +495,7 @@ class DocumentEditingEngine(
         val mergedParagraph = leftParagraph.copy(runs = (leftParagraph.runs + rightParagraph.runs).normalizedRuns())
         val combined = right.copy(
             blocks = left.blocks.dropLast(1) + mergedParagraph + right.blocks.drop(1),
-            startsOnNewPage = left.startsOnNewPage,
+            start = left.start,
         )
         val sections = buildList {
             addAll(snapshot.document.sections.take(leftIndex))

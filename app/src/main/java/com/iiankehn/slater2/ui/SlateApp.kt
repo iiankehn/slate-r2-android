@@ -13,6 +13,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
@@ -81,7 +82,10 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
@@ -99,6 +103,7 @@ import androidx.compose.ui.unit.sp
 import com.iiankehn.slater2.SlateViewModel
 import com.iiankehn.slater2.io.AndroidDocumentActions
 import com.iiankehn.slater2.io.DocumentFormats
+import com.iiankehn.slater2.io.DocxEmbeddedImage
 import com.iiankehn.slater2.io.R2DocumentBridge
 import com.iiankehn.slater2.editing.CharacterFormat
 import com.iiankehn.slater2.editing.FlatTextEditorAdapter
@@ -120,6 +125,7 @@ import com.iiankehn.slater2.model.TableBlock
 import com.iiankehn.slater2.model.ImageBlock
 import com.iiankehn.slater2.model.ImageWrapping
 import com.iiankehn.slater2.model.WordProcessingDocument
+import com.iiankehn.slater2.model.SectionStart
 import com.iiankehn.slater2.ui.theme.CanvasBackground
 import com.iiankehn.slater2.ui.theme.CoreBlue
 import com.iiankehn.slater2.ui.theme.Paper
@@ -187,8 +193,25 @@ fun SlateR2App(viewModel: SlateViewModel) {
                     val bytes = when (request.format) {
                         ExportFormat.Text -> DocumentFormats.exportText(request.document.body)
                         ExportFormat.Markdown -> DocumentFormats.exportMarkdown(request.document.body)
-                        ExportFormat.Docx -> DocumentFormats.exportDocx(request.document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(request.document))
-                        ExportFormat.Pdf -> AndroidDocumentActions.renderPdf(request.document)
+                        ExportFormat.Docx -> {
+                            val r2 = request.document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(request.document)
+                            val images = r2.sections.flatMap { it.blocks }.filterIsInstance<ImageBlock>().mapNotNull { image ->
+                                runCatching {
+                                    val uri = Uri.parse(image.sourceUri)
+                                    val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return@runCatching null
+                                    val contentType = context.contentResolver.getType(uri) ?: "image/png"
+                                    val extension = when (contentType) {
+                                        "image/jpeg" -> "jpg"
+                                        "image/gif" -> "gif"
+                                        "image/webp" -> "webp"
+                                        else -> "png"
+                                    }
+                                    image.id to DocxEmbeddedImage(bytes, extension, contentType)
+                                }.getOrNull()
+                            }.toMap()
+                            DocumentFormats.exportDocx(r2, images)
+                        }
+                        ExportFormat.Pdf -> AndroidDocumentActions.renderPdf(context, request.document)
                     }
                     context.contentResolver.openOutputStream(uri, "w")?.use { it.write(bytes) }
                         ?: error("Unable to write the selected file.")
@@ -367,6 +390,7 @@ private fun WordProcessorWorkspace(
     var zoom by remember { mutableStateOf(100) }
     var activePage by remember(document.id) { mutableStateOf(0) }
     var showHeaderFooterEditor by remember(document.id) { mutableStateOf(false) }
+    var showCustomPageSizeEditor by remember(document.id) { mutableStateOf(false) }
     val editor = remember(document.id) { FlatTextEditorAdapter(document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)) }
     var editorValue by remember(document.id) { mutableStateOf(TextFieldValue(annotatedBody(editor.legacyBody(), editor.document))) }
     var selectedObjectId by remember(document.id) { mutableStateOf<String?>(null) }
@@ -408,11 +432,15 @@ private fun WordProcessorWorkspace(
         publish(editor.handleTab(editorValue.selection.min, editorValue.selection.max, outdent))
     }
     fun updateLayout(action: LayoutAction) {
-        val page = editor.document.sections.first().page
+        val page = editor.document.sections[editor.activeSectionIndex].page
         val updated = when (action) {
             LayoutAction.Margins -> page.copy(margins = if (page.margins.topPoints == 72f) PageMargins(36f, 36f, 36f, 36f) else PageMargins())
             LayoutAction.Orientation -> page.copy(orientation = if (page.orientation == PageOrientation.Portrait) PageOrientation.Landscape else PageOrientation.Portrait)
-            LayoutAction.Size -> page.copy(size = PageSize.entries[(page.size.ordinal + 1) % PageSize.entries.size])
+            LayoutAction.Size -> page.copy(
+                size = PageSize.entries[(page.size.ordinal + 1) % PageSize.entries.size],
+                customWidthPoints = null,
+                customHeightPoints = null,
+            )
             LayoutAction.Columns -> page.copy(columns = page.columns % 4 + 1)
         }
         publish(editor.updatePageSetup(updated))
@@ -436,11 +464,12 @@ private fun WordProcessorWorkspace(
                 onToggleList = ::toggleList,
                 onAdjustListLevel = ::adjustListLevel,
                 onPageBreak = { publish(editor.insertPageBreak(editorValue.selection.min, editorValue.selection.max)) },
-                onSectionBreak = { publish(editor.insertSectionBreak(editorValue.selection.min, editorValue.selection.max)) },
+                onSectionBreak = { start -> publish(editor.insertSectionBreak(editorValue.selection.min, editorValue.selection.max, start)) },
                 onEditHeaderFooter = { showHeaderFooterEditor = true },
                 onInsertTable = { publish(editor.insertTable(editorValue.selection.min, editorValue.selection.max)) },
                 onInsertImage = onChooseImage,
                 onLayout = ::updateLayout,
+                onCustomPageSize = { showCustomPageSizeEditor = true },
                 onExport = onExport, onShare = onShare, onPrint = onPrint, onCheckUpdates = onCheckUpdates,
                 showNavigation = showNavigation, showInspector = showInspector,
                 onToggleNavigation = { showNavigation = !showNavigation }, onToggleInspector = { showInspector = !showInspector },
@@ -468,6 +497,9 @@ private fun WordProcessorWorkspace(
                         onTab = ::handleTab,
                         onUpdateTableCell = { id, row, column, text -> publish(editor.updateTableCell(id, row, column, text)) },
                         onResizeTable = { id, rows, columns -> publish(editor.resizeTable(id, rows, columns)) },
+                        onDeleteTableRow = { id, row -> publish(editor.deleteTableRow(id, row)) },
+                        onDeleteTableColumn = { id, column -> publish(editor.deleteTableColumn(id, column)) },
+                        onSetTableHeaderRows = { id, count -> publish(editor.setTableHeaderRows(id, count)) },
                         onUpdateImage = { id, description, width, height, wrapping ->
                             publish(editor.updateImage(id, description, width, height, wrapping))
                         },
@@ -501,6 +533,22 @@ private fun WordProcessorWorkspace(
             onSave = { header, footer ->
                 publish(editor.updateHeaderFooter(header, footer))
                 showHeaderFooterEditor = false
+            },
+        )
+    }
+    if (showCustomPageSizeEditor) {
+        val page = editor.document.sections[editor.activeSectionIndex].page
+        CustomPageSizeDialog(
+            initialWidth = page.widthPoints,
+            initialHeight = page.heightPoints,
+            onDismiss = { showCustomPageSizeEditor = false },
+            onSave = { width, height ->
+                publish(editor.updatePageSetup(page.copy(
+                    orientation = PageOrientation.Portrait,
+                    customWidthPoints = width,
+                    customHeightPoints = height,
+                )))
+                showCustomPageSizeEditor = false
             },
         )
     }
@@ -550,11 +598,12 @@ private fun Ribbon(
     onToggleList: (ListKind) -> Unit,
     onAdjustListLevel: (Int) -> Unit,
     onPageBreak: () -> Unit,
-    onSectionBreak: () -> Unit,
+    onSectionBreak: (SectionStart) -> Unit,
     onEditHeaderFooter: () -> Unit,
     onInsertTable: () -> Unit,
     onInsertImage: () -> Unit,
     onLayout: (LayoutAction) -> Unit,
+    onCustomPageSize: () -> Unit,
     onNew: () -> Unit,
     onOpen: () -> Unit,
     onExport: (ExportFormat) -> Unit,
@@ -592,11 +641,11 @@ private fun Ribbon(
                     RibbonGroup("Styles") { RibbonCommand("Title", { onToggle(RichTextStyle.HeadingOne) }); RibbonCommand("Normal", {}) }
                 }
                 RibbonTab.Insert -> {
-                    RibbonGroup("Pages") { RibbonCommand("Page break", onPageBreak); RibbonCommand("Section break", onSectionBreak) }
+                    RibbonGroup("Pages") { RibbonCommand("Page break", onPageBreak); SectionBreakMenu(onSectionBreak) }
                     RibbonGroup("Content") { RibbonCommand("Table", onInsertTable); RibbonCommand("Picture", onInsertImage); RibbonCommand("Link", { onToggle(RichTextStyle.Link) }) }
                     RibbonGroup("Page elements") { RibbonCommand("Header / footer", onEditHeaderFooter) }
                 }
-                RibbonTab.Layout -> RibbonGroup("Page setup") { RibbonCommand("Margins", { onLayout(LayoutAction.Margins) }); RibbonCommand("Orientation", { onLayout(LayoutAction.Orientation) }); RibbonCommand("Size", { onLayout(LayoutAction.Size) }); RibbonCommand("Columns", { onLayout(LayoutAction.Columns) }) }
+                RibbonTab.Layout -> RibbonGroup("Page setup") { RibbonCommand("Margins", { onLayout(LayoutAction.Margins) }); RibbonCommand("Orientation", { onLayout(LayoutAction.Orientation) }); RibbonCommand("Size", { onLayout(LayoutAction.Size) }); RibbonCommand("Custom size", onCustomPageSize); RibbonCommand("Columns", { onLayout(LayoutAction.Columns) }) }
                 RibbonTab.Review -> {
                     RibbonGroup("Proofing") { RibbonCommand("Spelling", {}); RibbonCommand("Word count", {}) }
                     RibbonGroup("Changes") { RibbonCommand("Comment", { onInsert("[Comment] ") }); RibbonCommand("Track", {}) }
@@ -633,6 +682,24 @@ private fun ExportMenu(onExport: (ExportFormat) -> Unit) {
         RibbonCommand("Export", { open = true })
         DropdownMenu(open, { open = false }) {
             ExportFormat.entries.forEach { format -> DropdownMenuItem(text = { Text(format.name) }, onClick = { open = false; onExport(format) }) }
+        }
+    }
+}
+
+@Composable
+private fun SectionBreakMenu(onInsert: (SectionStart) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        RibbonCommand("Section break", { open = true })
+        DropdownMenu(open, { open = false }) {
+            listOf(
+                SectionStart.Continuous to "Continuous",
+                SectionStart.NextPage to "Next page",
+                SectionStart.OddPage to "Odd page",
+                SectionStart.EvenPage to "Even page",
+            ).forEach { (start, label) ->
+                DropdownMenuItem(text = { Text(label) }, onClick = { open = false; onInsert(start) })
+            }
         }
     }
 }
@@ -748,6 +815,35 @@ private fun HeaderFooterEditorDialog(
 }
 
 @Composable
+private fun CustomPageSizeDialog(
+    initialWidth: Float,
+    initialHeight: Float,
+    onDismiss: () -> Unit,
+    onSave: (Float, Float) -> Unit,
+) {
+    var widthInches by remember(initialWidth) { mutableStateOf("%.2f".format(initialWidth / 72f)) }
+    var heightInches by remember(initialHeight) { mutableStateOf("%.2f".format(initialHeight / 72f)) }
+    val widthPoints = widthInches.toFloatOrNull()?.times(72f)
+    val heightPoints = heightInches.toFloatOrNull()?.times(72f)
+    val valid = widthPoints != null && heightPoints != null && widthPoints in 144f..1440f && heightPoints in 144f..1440f
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Custom page size") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Enter dimensions from 2 to 20 inches.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(widthInches, { widthInches = it }, label = { Text("Width (inches)") }, singleLine = true)
+                OutlinedTextField(heightInches, { heightInches = it }, label = { Text("Height (inches)") }, singleLine = true)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = valid, onClick = { onSave(requireNotNull(widthPoints), requireNotNull(heightPoints)) }) { Text("Apply") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
 private fun InspectorSection(title: String, values: List<Pair<String, String>>) {
     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
         Text(title, fontWeight = FontWeight.SemiBold)
@@ -777,6 +873,9 @@ private fun DocumentCanvas(
     onTab: (Boolean) -> Unit,
     onUpdateTableCell: (String, Int, Int, String) -> Unit,
     onResizeTable: (String, Int, Int) -> Unit,
+    onDeleteTableRow: (String, Int) -> Unit,
+    onDeleteTableColumn: (String, Int) -> Unit,
+    onSetTableHeaderRows: (String, Int) -> Unit,
     onUpdateImage: (String, String, Float?, Float?, ImageWrapping) -> Unit,
     onDeleteObject: (String) -> Unit,
     selectedObjectId: String?,
@@ -818,7 +917,8 @@ private fun DocumentCanvas(
                 Surface(
                     modifier = Modifier.widthIn(max = (760 * zoom / 100).dp).fillMaxWidth()
                         .aspectRatio(page.setup.widthPoints / page.setup.heightPoints)
-                        .clickable { onActivePageChange(pageIndex) },
+                        .clickable { onActivePageChange(pageIndex) }
+                        .semantics { contentDescription = "Document page ${pageIndex + 1} of ${layout.pageCount}" },
                     color = Paper,
                     contentColor = PaperText,
                     shape = RoundedCornerShape(3.dp),
@@ -833,6 +933,9 @@ private fun DocumentCanvas(
                                 pageIndex = pageIndex,
                                 onUpdateTableCell = onUpdateTableCell,
                                 onResizeTable = onResizeTable,
+                                onDeleteTableRow = onDeleteTableRow,
+                                onDeleteTableColumn = onDeleteTableColumn,
+                                onSetTableHeaderRows = onSetTableHeaderRows,
                                 onUpdateImage = onUpdateImage,
                                 onDeleteObject = onDeleteObject,
                                 selectedObjectId = selectedObjectId,
@@ -906,6 +1009,9 @@ private fun StructuredObjects(
     pageIndex: Int,
     onUpdateTableCell: (String, Int, Int, String) -> Unit,
     onResizeTable: (String, Int, Int) -> Unit,
+    onDeleteTableRow: (String, Int) -> Unit,
+    onDeleteTableColumn: (String, Int) -> Unit,
+    onSetTableHeaderRows: (String, Int) -> Unit,
     onUpdateImage: (String, String, Float?, Float?, ImageWrapping) -> Unit,
     onDeleteObject: (String) -> Unit,
     selectedObjectId: String?,
@@ -920,7 +1026,8 @@ private fun StructuredObjects(
         objects.forEach { block -> when (block) {
             is TableBlock -> EditableTable(
                 block, block.id == selectedObjectId, onSelectObject,
-                onUpdateTableCell, onResizeTable, onDeleteObject,
+                onUpdateTableCell, onResizeTable, onDeleteTableRow, onDeleteTableColumn,
+                onSetTableHeaderRows, onDeleteObject,
             )
             is ImageBlock -> EditableImage(
                 block, block.id == selectedObjectId, onSelectObject, onUpdateImage, onDeleteObject,
@@ -991,6 +1098,9 @@ private fun EditableTable(
     onSelect: (String?) -> Unit,
     onUpdateCell: (String, Int, Int, String) -> Unit,
     onResize: (String, Int, Int) -> Unit,
+    onDeleteRow: (String, Int) -> Unit,
+    onDeleteColumn: (String, Int) -> Unit,
+    onSetHeaderRows: (String, Int) -> Unit,
     onDelete: (String) -> Unit,
 ) {
     val columnCount = table.rows.first().cells.size
@@ -1016,7 +1126,22 @@ private fun EditableTable(
                 Text("Table · ${table.rows.size} × $columnCount", color = PaperText, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 TextButton(onClick = { onResize(table.id, table.rows.size + 1, columnCount) }) { Text("+ Row") }
                 TextButton(onClick = { onResize(table.id, table.rows.size, columnCount + 1) }) { Text("+ Column") }
-                TextButton(onClick = { onDelete(table.id) }) { Text("Delete") }
+                TextButton(onClick = { onDelete(table.id) }) { Text("Delete table") }
+            }
+            if (selected) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        enabled = table.rows.size > 1,
+                        onClick = { onDeleteRow(table.id, table.rows.lastIndex) },
+                    ) { Text("− Last row") }
+                    TextButton(
+                        enabled = columnCount > 1,
+                        onClick = { onDeleteColumn(table.id, columnCount - 1) },
+                    ) { Text("− Last column") }
+                    TextButton(onClick = { onSetHeaderRows(table.id, if (table.headerRowCount == 0) 1 else 0) }) {
+                        Text(if (table.headerRowCount == 0) "Repeat first row" else "Stop repeating header")
+                    }
+                }
             }
             table.rows.forEachIndexed { rowIndex, row ->
                 Row(Modifier.fillMaxWidth()) {
@@ -1062,6 +1187,8 @@ private fun EditableImage(
     }
     val width = image.widthPoints ?: 300f
     val height = image.heightPoints ?: 200f
+    var previewWidth by remember(image.id, width) { mutableStateOf(width) }
+    var previewHeight by remember(image.id, height) { mutableStateOf(height) }
     val focusRequester = remember { FocusRequester() }
     Surface(
         modifier = Modifier
@@ -1112,6 +1239,30 @@ private fun EditableImage(
                 }) { Text(image.wrapping.name) }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = { onDelete(image.id) }) { Text("Delete") }
+            }
+            if (selected) {
+                Box(
+                    Modifier
+                        .align(Alignment.End)
+                        .background(CoreBlue, RoundedCornerShape(8.dp))
+                        .semantics { contentDescription = "Drag to resize picture" }
+                        .pointerInput(image.id, width, height) {
+                            detectDragGestures(
+                                onDragStart = { previewWidth = width; previewHeight = height },
+                                onDragEnd = {
+                                    onUpdate(image.id, image.description, previewWidth, previewHeight, image.wrapping)
+                                },
+                                onDragCancel = { previewWidth = width; previewHeight = height },
+                            ) { change, dragAmount ->
+                                change.consume()
+                                previewWidth = (previewWidth + dragAmount.x).coerceIn(72f, 1200f)
+                                previewHeight = (previewHeight + dragAmount.y).coerceIn(48f, 1200f)
+                            }
+                        }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text("↘  ${previewWidth.toInt()} × ${previewHeight.toInt()} pt", color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
             }
         }
     }

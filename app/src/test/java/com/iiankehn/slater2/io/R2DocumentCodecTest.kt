@@ -18,7 +18,7 @@ class R2DocumentCodecTest {
                 ),
                 header = listOf(ParagraphBlock("header", listOf(TextRun("Confidential")))),
                 footer = listOf(ParagraphBlock("footer", listOf(TextRun("Page")))),
-                startsOnNewPage = true,
+                start = SectionStart.NextPage,
             )),
             metadata = DocumentMetadata("Author", "Subject", setOf("one", "two"), 10, 20),
         )

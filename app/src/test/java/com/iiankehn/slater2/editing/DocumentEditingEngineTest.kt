@@ -11,6 +11,7 @@ import com.iiankehn.slater2.model.ParagraphStyle
 import com.iiankehn.slater2.model.TextRun
 import com.iiankehn.slater2.model.WordProcessingDocument
 import com.iiankehn.slater2.model.TableBlock
+import com.iiankehn.slater2.model.SectionStart
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -166,7 +167,7 @@ class DocumentEditingEngineTest {
         assertEquals(2, session.current.document.sections.size)
         assertEquals("Alpha", (session.current.document.sections[0].blocks.single() as ParagraphBlock).runs.single().text)
         assertEquals("Beta", (session.current.document.sections[1].blocks.single() as ParagraphBlock).runs.single().text)
-        assertTrue(session.current.document.sections[1].startsOnNewPage)
+        assertEquals(SectionStart.NextPage, session.current.document.sections[1].start)
         assertEquals(DocumentPosition(1, 0, 0), session.current.selection.focus)
 
         session.execute(DocumentCommand.UpdateHeaderFooter("Report", "Confidential\nPage"))
@@ -183,7 +184,7 @@ class DocumentEditingEngineTest {
             "",
             listOf(
                 DocumentSection(PageSetup(PageSize.Letter), listOf(ParagraphBlock("left", listOf(TextRun("Left"))))),
-                DocumentSection(PageSetup(PageSize.A4), listOf(ParagraphBlock("right", listOf(TextRun("Right")))), startsOnNewPage = true),
+                DocumentSection(PageSetup(PageSize.A4), listOf(ParagraphBlock("right", listOf(TextRun("Right")))), start = SectionStart.NextPage),
             ),
         )
         val snapshot = EditorSnapshot(document, DocumentSelection(DocumentPosition(1, 0, 0)))
@@ -194,6 +195,41 @@ class DocumentEditingEngineTest {
         assertEquals(PageSize.A4, joined.document.sections.single().page.size)
         assertEquals("LeftRight", (joined.document.sections.single().blocks.single() as ParagraphBlock).runs.single().text)
         assertEquals(DocumentPosition(0, 0, 4), joined.selection.focus)
+    }
+
+    @Test
+    fun replacementAcrossSectionsRemovesBoundariesAndKeepsFollowingSetup() {
+        val document = WordProcessingDocument(
+            "document", "", listOf(
+                DocumentSection(PageSetup(PageSize.Letter), listOf(ParagraphBlock("left", listOf(TextRun("Alpha"))))),
+                DocumentSection(PageSetup(PageSize.A4), listOf(ParagraphBlock("right", listOf(TextRun("Omega")))), start = SectionStart.NextPage),
+            ),
+        )
+        val selected = EditorSnapshot(
+            document,
+            DocumentSelection(DocumentPosition(0, 0, 2), DocumentPosition(1, 0, 3)),
+        )
+
+        val replaced = engine.execute(selected, DocumentCommand.ReplaceSelection("X\nY")).snapshot
+
+        assertEquals(1, replaced.document.sections.size)
+        assertEquals(PageSize.A4, replaced.document.sections.single().page.size)
+        assertEquals(listOf("AlX", "Yga"), replaced.paragraphTexts())
+        assertEquals(DocumentPosition(0, 1, 1), replaced.selection.focus)
+    }
+
+    @Test
+    fun tableRowsColumnsAndRepeatingHeadersAreEditable() {
+        val inserted = engine.execute(snapshot("One"), DocumentCommand.InsertTable(3, 3)).snapshot
+        val table = inserted.document.sections.single().blocks.filterIsInstance<TableBlock>().single()
+        val withHeader = engine.execute(inserted, DocumentCommand.SetTableHeaderRows(table.id, 1)).snapshot
+        val withoutRow = engine.execute(withHeader, DocumentCommand.DeleteTableRow(table.id, 1)).snapshot
+        val withoutColumn = engine.execute(withoutRow, DocumentCommand.DeleteTableColumn(table.id, 2)).snapshot
+        val updated = withoutColumn.document.sections.single().blocks.filterIsInstance<TableBlock>().single()
+
+        assertEquals(2, updated.rows.size)
+        assertEquals(2, updated.rows.first().cells.size)
+        assertEquals(1, updated.headerRowCount)
     }
 
     @Test

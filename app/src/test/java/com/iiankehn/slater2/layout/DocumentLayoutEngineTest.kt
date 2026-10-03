@@ -8,6 +8,7 @@ import com.iiankehn.slater2.model.PageSetup
 import com.iiankehn.slater2.model.ParagraphBlock
 import com.iiankehn.slater2.model.ParagraphStyle
 import com.iiankehn.slater2.model.TableBlock
+import com.iiankehn.slater2.model.SectionStart
 import com.iiankehn.slater2.model.TableCell
 import com.iiankehn.slater2.model.TableRow
 import com.iiankehn.slater2.model.TextRun
@@ -17,6 +18,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DocumentLayoutEngineTest {
+
+    @Test
+    fun oddAndEvenSectionStartsInsertParityPages() {
+        val document = WordProcessingDocument(
+            "parity", "Parity", listOf(
+                DocumentSection(blocks = listOf(ParagraphBlock("one", listOf(TextRun("One"))))),
+                DocumentSection(blocks = listOf(ParagraphBlock("odd", listOf(TextRun("Odd")))), start = SectionStart.OddPage),
+                DocumentSection(blocks = listOf(ParagraphBlock("even", listOf(TextRun("Even")))), start = SectionStart.EvenPage),
+            ),
+        )
+
+        val layout = DocumentLayoutEngine().layout(document)
+        val oddPage = layout.blockLocations.getValue("odd").single().first + 1
+        val evenPage = layout.blockLocations.getValue("even").single().first + 1
+
+        assertEquals(1, oddPage % 2)
+        assertEquals(0, evenPage % 2)
+    }
     private val engine = DocumentLayoutEngine()
 
     @Test

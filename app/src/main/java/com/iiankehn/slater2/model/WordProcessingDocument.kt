@@ -37,12 +37,14 @@ data class DocumentSection(
     val blocks: List<DocumentBlock> = listOf(ParagraphBlock()),
     val header: List<ParagraphBlock> = emptyList(),
     val footer: List<ParagraphBlock> = emptyList(),
-    val startsOnNewPage: Boolean = false,
+    val start: SectionStart = SectionStart.Continuous,
 ) {
     init {
         require(blocks.isNotEmpty()) { "A section needs at least one content block." }
     }
 }
+
+enum class SectionStart { Continuous, NextPage, OddPage, EvenPage }
 
 data class PageSetup(
     val size: PageSize = PageSize.Letter,
@@ -50,20 +52,33 @@ data class PageSetup(
     val margins: PageMargins = PageMargins(),
     val columns: Int = 1,
     val columnSpacingPoints: Float = 18f,
+    val customWidthPoints: Float? = null,
+    val customHeightPoints: Float? = null,
 ) {
     init {
         require(columns in 1..4) { "Slate R2 supports between one and four text columns." }
         require(columnSpacingPoints >= 0f) { "Column spacing cannot be negative." }
+        require((customWidthPoints == null) == (customHeightPoints == null)) { "Custom page dimensions must be supplied together." }
+        require(customWidthPoints == null || customWidthPoints in 144f..1440f) { "Custom page width must be between 2 and 20 inches." }
+        require(customHeightPoints == null || customHeightPoints in 144f..1440f) { "Custom page height must be between 2 and 20 inches." }
         require(widthPoints > margins.startPoints + margins.endPoints) { "Horizontal margins must leave printable space." }
         require(heightPoints > margins.topPoints + margins.bottomPoints) { "Vertical margins must leave printable space." }
         require(columnWidthPoints > 0f) { "Columns and spacing must leave printable space." }
     }
 
     val widthPoints: Float
-        get() = if (orientation == PageOrientation.Portrait) size.widthPoints else size.heightPoints
+        get() {
+            val portraitWidth = customWidthPoints ?: size.widthPoints
+            val portraitHeight = customHeightPoints ?: size.heightPoints
+            return if (orientation == PageOrientation.Portrait) portraitWidth else portraitHeight
+        }
 
     val heightPoints: Float
-        get() = if (orientation == PageOrientation.Portrait) size.heightPoints else size.widthPoints
+        get() {
+            val portraitWidth = customWidthPoints ?: size.widthPoints
+            val portraitHeight = customHeightPoints ?: size.heightPoints
+            return if (orientation == PageOrientation.Portrait) portraitHeight else portraitWidth
+        }
 
     val contentWidthPoints: Float
         get() = widthPoints - margins.startPoints - margins.endPoints

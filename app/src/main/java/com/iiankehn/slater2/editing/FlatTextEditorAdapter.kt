@@ -7,6 +7,7 @@ import com.iiankehn.slater2.model.WordProcessingDocument
 import com.iiankehn.slater2.model.ListKind
 import com.iiankehn.slater2.model.PageSetup
 import com.iiankehn.slater2.model.ImageWrapping
+import com.iiankehn.slater2.model.SectionStart
 
 data class FlatEditorState(val text: String, val selectionStart: Int, val selectionEnd: Int)
 
@@ -82,9 +83,9 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
         return state()
     }
 
-    fun insertSectionBreak(start: Int, end: Int): FlatEditorState {
+    fun insertSectionBreak(start: Int, end: Int, sectionStart: SectionStart = SectionStart.NextPage): FlatEditorState {
         session.updateSelection(DocumentSelection(index.position(start), index.position(end)))
-        session.execute(DocumentCommand.InsertSectionBreak)
+        session.execute(DocumentCommand.InsertSectionBreakAs(sectionStart))
         return state()
     }
 
@@ -112,6 +113,21 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
 
     fun resizeTable(tableId: String, rows: Int, columns: Int): FlatEditorState {
         session.execute(DocumentCommand.ResizeTable(tableId, rows, columns))
+        return state()
+    }
+
+    fun deleteTableRow(tableId: String, row: Int): FlatEditorState {
+        session.execute(DocumentCommand.DeleteTableRow(tableId, row))
+        return state()
+    }
+
+    fun deleteTableColumn(tableId: String, column: Int): FlatEditorState {
+        session.execute(DocumentCommand.DeleteTableColumn(tableId, column))
+        return state()
+    }
+
+    fun setTableHeaderRows(tableId: String, count: Int): FlatEditorState {
+        session.execute(DocumentCommand.SetTableHeaderRows(tableId, count))
         return state()
     }
 

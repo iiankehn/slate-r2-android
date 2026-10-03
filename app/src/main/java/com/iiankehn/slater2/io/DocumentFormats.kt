@@ -14,6 +14,12 @@ data class ImportedDocument(
     val wordProcessingDocument: WordProcessingDocument? = null,
 )
 
+data class DocxEmbeddedImage(
+    val bytes: ByteArray,
+    val extension: String,
+    val contentType: String,
+)
+
 object DocumentFormats {
     const val MAX_DOCUMENT_BYTES = 25 * 1024 * 1024
     private const val MAX_DOCX_ENTRIES = 2_000
@@ -86,6 +92,7 @@ object DocumentFormats {
         require(bytes.size <= MAX_DOCUMENT_BYTES) { "Document is larger than 25 MB." }
         var documentXml: ByteArray? = null
         var relationshipsXml: ByteArray? = null
+        val marginParts = mutableMapOf<String, ByteArray>()
         var entries = 0
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
             while (true) {
@@ -96,6 +103,8 @@ object DocumentFormats {
                     documentXml = zip.readLimited(MAX_XML_BYTES)
                 } else if (entry.name == "word/_rels/document.xml.rels") {
                     relationshipsXml = zip.readLimited(MAX_XML_BYTES)
+                } else if (entry.name.matches(Regex("word/(header|footer)\\d+\\.xml"))) {
+                    marginParts[entry.name] = zip.readLimited(MAX_XML_BYTES)
                 }
             }
         }
@@ -103,6 +112,7 @@ object DocumentFormats {
             requireNotNull(documentXml) { "DOCX is missing word/document.xml." },
             relationshipsXml,
             fallbackTitle,
+            marginParts,
         )
         return ImportedDocument(
             title = parsed.document.title,
@@ -131,26 +141,75 @@ object DocumentFormats {
         return output.toByteArray()
     }
 
-    fun exportDocx(document: WordProcessingDocument): ByteArray {
+    fun exportDocx(
+        document: WordProcessingDocument,
+        embeddedImages: Map<String, DocxEmbeddedImage> = emptyMap(),
+    ): ByteArray {
         val output = ByteArrayOutputStream()
+        val imageBlocks = document.sections.flatMap { it.blocks }.filterIsInstance<ImageBlock>()
+            .filter { it.id in embeddedImages }
+        val imageRelationships = imageBlocks.mapIndexed { index, image -> image.id to "rIdImage${index + 1}" }.toMap()
         ZipOutputStream(output).use { zip ->
             zip.putNextEntry(ZipEntry("[Content_Types].xml"))
-            zip.write("""<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>""".toByteArray())
+            val marginOverrides = document.sections.mapIndexed { index, section ->
+                buildString {
+                    if (section.header.isNotEmpty()) append("<Override PartName=\"/word/header${index + 1}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml\"/>")
+                    if (section.footer.isNotEmpty()) append("<Override PartName=\"/word/footer${index + 1}.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml\"/>")
+                }
+            }.joinToString("")
+            val imageDefaults = imageBlocks.mapNotNull { block -> embeddedImages[block.id] }
+                .distinctBy { it.extension.lowercase() }
+                .joinToString("") { "<Default Extension=\"${encodeXml(it.extension.lowercase())}\" ContentType=\"${encodeXml(it.contentType)}\"/>" }
+            zip.write("""<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>$imageDefaults<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>$marginOverrides</Types>""".toByteArray())
             zip.closeEntry()
             zip.putNextEntry(ZipEntry("_rels/.rels"))
             zip.write("""<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>""".toByteArray())
             zip.closeEntry()
+            zip.putNextEntry(ZipEntry("word/_rels/document.xml.rels"))
+            val marginRelationships = document.sections.mapIndexed { index, section ->
+                buildString {
+                    if (section.header.isNotEmpty()) append("<Relationship Id=\"rIdHeader${index + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/header\" Target=\"header${index + 1}.xml\"/>")
+                    if (section.footer.isNotEmpty()) append("<Relationship Id=\"rIdFooter${index + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer\" Target=\"footer${index + 1}.xml\"/>")
+                }
+            }.joinToString("")
+            val imageRelsXml = imageBlocks.mapIndexed { index, block ->
+                val image = embeddedImages.getValue(block.id)
+                "<Relationship Id=\"rIdImage${index + 1}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/image\" Target=\"media/image${index + 1}.${encodeXml(image.extension.lowercase())}\"/>"
+            }.joinToString("")
+            zip.write("""<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdNumbering" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>$marginRelationships$imageRelsXml</Relationships>""".toByteArray())
+            zip.closeEntry()
+            imageBlocks.forEachIndexed { index, block ->
+                val image = embeddedImages.getValue(block.id)
+                zip.putNextEntry(ZipEntry("word/media/image${index + 1}.${image.extension.lowercase()}"))
+                zip.write(image.bytes)
+                zip.closeEntry()
+            }
+            zip.putNextEntry(ZipEntry("word/numbering.xml"))
+            zip.write(numberingXml().toByteArray())
+            zip.closeEntry()
+            document.sections.forEachIndexed { index, section ->
+                if (section.header.isNotEmpty()) {
+                    zip.putNextEntry(ZipEntry("word/header${index + 1}.xml"))
+                    zip.write(marginPartXml("hdr", section.header).toByteArray())
+                    zip.closeEntry()
+                }
+                if (section.footer.isNotEmpty()) {
+                    zip.putNextEntry(ZipEntry("word/footer${index + 1}.xml"))
+                    zip.write(marginPartXml("ftr", section.footer).toByteArray())
+                    zip.closeEntry()
+                }
+            }
             zip.putNextEntry(ZipEntry("word/document.xml"))
             val body = document.sections.mapIndexed { index, section ->
-                section.blocks.joinToString("") { it.toWordXml() } + section.toSectionXml(index < document.sections.lastIndex)
+                section.blocks.joinToString("") { it.toWordXml(imageRelationships) } + section.toSectionXml(index, index < document.sections.lastIndex)
             }.joinToString("")
-            zip.write("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>$body</w:body></w:document>""".toByteArray())
+            zip.write("""<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><w:body>$body</w:body></w:document>""".toByteArray())
             zip.closeEntry()
         }
         return output.toByteArray()
     }
 
-    private fun DocumentBlock.toWordXml(): String = when (this) {
+    private fun DocumentBlock.toWordXml(imageRelationships: Map<String, String> = emptyMap()): String = when (this) {
         is ParagraphBlock -> {
             val paragraphProperties = buildString {
                 append("<w:pPr>")
@@ -158,12 +217,20 @@ object DocumentFormats {
                 append("<w:jc w:val=\"").append(when (style.alignment) { ParagraphAlignment.Start -> "left"; ParagraphAlignment.Center -> "center"; ParagraphAlignment.End -> "right"; ParagraphAlignment.Justify -> "both" }).append("\"/>")
                 append("<w:spacing w:before=\"").append((style.spaceBeforePoints * 20).toInt()).append("\" w:after=\"").append((style.spaceAfterPoints * 20).toInt()).append("\"/>")
                 if (style.pageBreakBefore) append("<w:pageBreakBefore/>")
+                style.list?.let { list ->
+                    append("<w:numPr><w:ilvl w:val=\"").append(list.level).append("\"/><w:numId w:val=\"").append(list.kind.ordinal + 1).append("\"/></w:numPr>")
+                }
                 append("</w:pPr>")
             }
             "<w:p>$paragraphProperties${runs.joinToString("") { it.toWordXml() }}</w:p>"
         }
-        is TableBlock -> "<w:tbl>${rows.joinToString("") { row -> "<w:tr>${row.cells.joinToString("") { cell -> "<w:tc>${cell.blocks.joinToString("") { it.toWordXml() }}</w:tc>" }}</w:tr>" }}</w:tbl>"
-        is ImageBlock -> "<w:p><w:r><w:t xml:space=\"preserve\">${encodeXml(if (description.isBlank()) "[Image]" else "[Image: $description]")}</w:t></w:r></w:p>"
+        is TableBlock -> "<w:tbl>${rows.mapIndexed { rowIndex, row -> "<w:tr>${if (rowIndex < headerRowCount) "<w:trPr><w:tblHeader/></w:trPr>" else ""}${row.cells.joinToString("") { cell -> "<w:tc><w:tcPr>${if (cell.columnSpan > 1) "<w:gridSpan w:val=\"${cell.columnSpan}\"/>" else ""}</w:tcPr>${cell.blocks.joinToString("") { it.toWordXml(imageRelationships) }}</w:tc>" }}</w:tr>" }.joinToString("")}</w:tbl>"
+        is ImageBlock -> imageRelationships[id]?.let { relationshipId ->
+            val width = ((widthPoints ?: 300f) * 12_700).toLong()
+            val height = ((heightPoints ?: 200f) * 12_700).toLong()
+            val numericId = id.hashCode().toLong().let { if (it < 0) -it else it }.coerceAtLeast(1)
+            "<w:p><w:r><w:drawing><wp:inline><wp:extent cx=\"$width\" cy=\"$height\"/><wp:docPr id=\"$numericId\" name=\"Picture\" descr=\"${encodeXml(description)}\"/><a:graphic><a:graphicData uri=\"http://schemas.openxmlformats.org/drawingml/2006/picture\"><pic:pic><pic:nvPicPr><pic:cNvPr id=\"$numericId\" name=\"Picture\"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed=\"$relationshipId\"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"$width\" cy=\"$height\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"
+        } ?: "<w:p><w:r><w:t xml:space=\"preserve\">${encodeXml(if (description.isBlank()) "[Image]" else "[Image: $description]")}</w:t></w:r></w:p>"
     }
 
     private fun TextRun.toWordXml(): String {
@@ -177,10 +244,34 @@ object DocumentFormats {
         return "<w:r>$properties<w:t xml:space=\"preserve\">${encodeXml(text)}</w:t></w:r>"
     }
 
-    private fun DocumentSection.toSectionXml(nextPage: Boolean): String {
+    private fun DocumentSection.toSectionXml(index: Int, nextPage: Boolean): String {
         val width = page.widthPoints.times(20).toInt(); val height = page.heightPoints.times(20).toInt()
         val margins = page.margins
-        return "<w:sectPr>${if (nextPage || startsOnNewPage) "<w:type w:val=\"nextPage\"/>" else ""}<w:pgSz w:w=\"$width\" w:h=\"$height\"/><w:pgMar w:top=\"${(margins.topPoints * 20).toInt()}\" w:right=\"${(margins.endPoints * 20).toInt()}\" w:bottom=\"${(margins.bottomPoints * 20).toInt()}\" w:left=\"${(margins.startPoints * 20).toInt()}\"/><w:cols w:num=\"${page.columns}\" w:space=\"${(page.columnSpacingPoints * 20).toInt()}\"/></w:sectPr>"
+        val references = buildString {
+            if (header.isNotEmpty()) append("<w:headerReference w:type=\"default\" r:id=\"rIdHeader${index + 1}\"/>")
+            if (footer.isNotEmpty()) append("<w:footerReference w:type=\"default\" r:id=\"rIdFooter${index + 1}\"/>")
+        }
+        val sectionType = when {
+            nextPage && start == SectionStart.Continuous -> "nextPage"
+            start == SectionStart.Continuous -> "continuous"
+            start == SectionStart.NextPage -> "nextPage"
+            start == SectionStart.OddPage -> "oddPage"
+            else -> "evenPage"
+        }
+        return "<w:sectPr>$references<w:type w:val=\"$sectionType\"/><w:pgSz w:w=\"$width\" w:h=\"$height\"/><w:pgMar w:top=\"${(margins.topPoints * 20).toInt()}\" w:right=\"${(margins.endPoints * 20).toInt()}\" w:bottom=\"${(margins.bottomPoints * 20).toInt()}\" w:left=\"${(margins.startPoints * 20).toInt()}\"/><w:cols w:num=\"${page.columns}\" w:space=\"${(page.columnSpacingPoints * 20).toInt()}\"/></w:sectPr>"
+    }
+
+    private fun marginPartXml(tag: String, paragraphs: List<ParagraphBlock>): String =
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:$tag xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">${paragraphs.joinToString("") { it.toWordXml() }}</w:$tag>"
+
+    private fun numberingXml(): String {
+        fun levels(format: String, text: (Int) -> String): String = (0..8).joinToString("") { level ->
+            "<w:lvl w:ilvl=\"$level\"><w:start w:val=\"1\"/><w:numFmt w:val=\"$format\"/><w:lvlText w:val=\"${text(level)}\"/><w:pPr><w:ind w:left=\"${720 * (level + 1)}\" w:hanging=\"360\"/></w:pPr></w:lvl>"
+        }
+        val bullet = levels("bullet") { listOf("•", "◦", "▪")[it % 3] }
+        val decimal = levels("decimal") { "%${it + 1}." }
+        val checklist = levels("bullet") { "☐" }
+        return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><w:numbering xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:abstractNum w:abstractNumId=\"0\">$bullet</w:abstractNum><w:abstractNum w:abstractNumId=\"1\">$decimal</w:abstractNum><w:abstractNum w:abstractNumId=\"2\">$checklist</w:abstractNum><w:num w:numId=\"1\"><w:abstractNumId w:val=\"0\"/></w:num><w:num w:numId=\"2\"><w:abstractNumId w:val=\"1\"/></w:num><w:num w:numId=\"3\"><w:abstractNumId w:val=\"2\"/></w:num></w:numbering>"
     }
 
     private fun wrap(text: StringBuilder, range: RichTextRange, before: String, after: String) {

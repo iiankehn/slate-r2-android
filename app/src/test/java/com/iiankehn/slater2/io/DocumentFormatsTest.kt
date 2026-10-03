@@ -4,6 +4,8 @@ import com.iiankehn.slater2.model.*
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
+import java.util.zip.ZipInputStream
 
 class DocumentFormatsTest {
     @Test
@@ -44,6 +46,8 @@ class DocumentFormatsTest {
                         ),
                     ),
                 ),
+                header = listOf(ParagraphBlock("header", listOf(TextRun("Report header")))),
+                footer = listOf(ParagraphBlock("footer", listOf(TextRun("Report footer")))),
             )),
         )
         val imported = DocumentFormats.importDocx(DocumentFormats.exportDocx(source), "Fallback")
@@ -56,11 +60,67 @@ class DocumentFormatsTest {
         assertEquals(NamedParagraphStyle.Heading1, heading.style.namedStyle)
         assertTrue(heading.runs.first().style.bold)
         assertTrue(section.blocks[1] is TableBlock)
+        assertEquals("Report header", section.header.single().runs.single().text)
+        assertEquals("Report footer", section.footer.single().runs.single().text)
     }
 
     @Test(expected = IllegalArgumentException::class)
     fun malformedDocxIsRejected() {
         DocumentFormats.importDocx("not a zip".toByteArray(), "Broken")
+    }
+
+    @Test
+    fun structuredDocxWritesNumberingHeadersFootersAndRepeatingTableHeaders() {
+        val listed = ParagraphBlock(
+            "item", listOf(TextRun("Item")),
+            ParagraphStyle(list = ListStyle(ListKind.Numbered, level = 1)),
+        )
+        val table = TableBlock("table", listOf(TableRow(listOf(TableCell()))), headerRowCount = 1)
+        val source = WordProcessingDocument(
+            "source", "Report", listOf(DocumentSection(
+                blocks = listOf(listed, table),
+                header = listOf(ParagraphBlock("header", listOf(TextRun("Header")))),
+                footer = listOf(ParagraphBlock("footer", listOf(TextRun("Footer")))),
+            )),
+        )
+
+        val entries = mutableMapOf<String, String>()
+        ZipInputStream(ByteArrayInputStream(DocumentFormats.exportDocx(source))).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                entries[entry.name] = zip.readBytes().toString(Charsets.UTF_8)
+            }
+        }
+
+        assertTrue("word/numbering.xml" in entries)
+        assertTrue("word/header1.xml" in entries)
+        assertTrue("word/footer1.xml" in entries)
+        assertTrue(entries.getValue("word/document.xml").contains("<w:numPr>"))
+        assertTrue(entries.getValue("word/document.xml").contains("<w:tblHeader/>"))
+        assertTrue(entries.getValue("word/document.xml").contains("rIdHeader1"))
+    }
+
+    @Test
+    fun structuredDocxEmbedsProvidedImageRelationships() {
+        val image = ImageBlock("image", "content://picture", "Chart", 240f, 160f)
+        val source = WordProcessingDocument(
+            "source", "Pictures", listOf(DocumentSection(blocks = listOf(ParagraphBlock("p"), image))),
+        )
+        val bytes = DocumentFormats.exportDocx(
+            source,
+            mapOf(image.id to DocxEmbeddedImage(byteArrayOf(1, 2, 3), "png", "image/png")),
+        )
+        val entries = mutableMapOf<String, ByteArray>()
+        ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                entries[entry.name] = zip.readBytes()
+            }
+        }
+
+        assertTrue("word/media/image1.png" in entries)
+        assertTrue(entries.getValue("word/document.xml").toString(Charsets.UTF_8).contains("r:embed=\"rIdImage1\""))
+        assertTrue(entries.getValue("word/_rels/document.xml.rels").toString(Charsets.UTF_8).contains("relationships/image"))
     }
 
     @Test
