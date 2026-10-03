@@ -4,7 +4,7 @@ R2 uses capability milestones rather than treating its name as a sequence after 
 
 Current development focus moves from core editing toward precise object and document layout behavior.
 
-## Foundation — in progress
+## Foundation — complete
 
 - Independent application package, repository, updater, CI, and monthly release workflow
 - Device-independent word-processing document model
@@ -25,6 +25,7 @@ Current development focus moves from core editing toward precise object and docu
 - [x] Tab insertion, Tab/Shift+Tab list nesting, checklist paragraphs, and multilevel markers
 - [x] Next-page section insertion, inherited setup, editable headers/footers, and boundary deletion
 - [x] Object selection, focus treatment, and keyboard deletion for tables and pictures
+- [x] Cross-section range replacement and interactive checklist state
 
 ## Layout engine
 
@@ -37,7 +38,8 @@ Current development focus moves from core editing toward precise object and docu
 - [x] Shared pagination geometry for status, PDF, and print
 - [x] Stacked editable pages, page-aware text ranges and objects, thumbnail navigation, and active-page status
 - [x] Section-aware repeated headers and footers with phone dialog and desktop inspector editing
-- Drag handles, floating-object layout, and section-continuation rules
+- [x] Direct picture resize handle and continuous/next/odd/even section starts
+- True floating-object layout and text exclusion around positioned objects
 
 ## Interchange
 
@@ -46,11 +48,12 @@ Current development focus moves from core editing toward precise object and docu
 - [x] Deterministic PDF and printing from the layout engine
 - [x] Markdown and plain-text boundary adapters
 - [x] Structural DOCX import for styled runs, tables, links, and page setup
-- Embedded image relationships, numbering definitions, headers/footers, and broader fidelity fixtures
+- [x] DOCX numbering definitions, repeating table headers, embedded image relationships, and header/footer parts
+- Imported embedded-media extraction and broader third-party fidelity fixtures
 
 ## Release readiness
 
-- Accessibility semantics audit and large-document performance profiling
+- [x] Accessibility semantics pass and deterministic large-document profiling fixture
 - [x] ARM64 and x86_64 native-dependency validation in CI
-- Phone, tablet, foldable, and Googlebook Android acceptance matrix
+- [x] Phone, tablet, foldable, and Googlebook Android acceptance matrix
 - Signed updater and monthly publication (requires repository signing secrets)

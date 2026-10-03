@@ -58,6 +58,7 @@ sealed interface DocumentCommand {
     data class ApplyNamedStyle(val style: NamedParagraphStyle) : DocumentCommand
     data class ToggleList(val kind: ListKind) : DocumentCommand
     data class AdjustListLevel(val delta: Int) : DocumentCommand
+    data class ToggleChecklistItem(val paragraphId: String) : DocumentCommand
     data class HandleTab(val outdent: Boolean) : DocumentCommand
     data class UpdatePageSetup(val page: PageSetup) : DocumentCommand
     data object InsertPageBreak : DocumentCommand
@@ -118,6 +119,7 @@ class DocumentEditingEngine(
                 it.copy(list = if (it.list?.kind == command.kind) null else ListStyle(command.kind, it.list?.level ?: 0))
             }
             is DocumentCommand.AdjustListLevel -> adjustListLevel(snapshot, command.delta)
+            is DocumentCommand.ToggleChecklistItem -> toggleChecklistItem(snapshot, command.paragraphId)
             is DocumentCommand.HandleTab -> handleTab(snapshot, command.outdent)
             is DocumentCommand.UpdatePageSetup -> updatePageSetup(snapshot, command.page)
             DocumentCommand.InsertPageBreak -> insertPageBreak(snapshot)
@@ -209,6 +211,19 @@ class DocumentEditingEngine(
         return applyParagraphStyle(snapshot) { style ->
             style.list?.let { list -> style.copy(list = list.copy(level = (list.level + delta).coerceIn(0, 8))) } ?: style
         }
+    }
+
+    private fun toggleChecklistItem(snapshot: EditorSnapshot, paragraphId: String): EditorSnapshot {
+        var changed = false
+        val sections = snapshot.document.sections.map { section ->
+            section.copy(blocks = section.blocks.map { block ->
+                val paragraph = block as? ParagraphBlock ?: return@map block
+                val list = paragraph.style.list
+                if (paragraph.id != paragraphId || list?.kind != ListKind.Checklist) paragraph
+                else paragraph.copy(style = paragraph.style.copy(list = list.copy(checked = !list.checked))).also { changed = true }
+            })
+        }
+        return if (!changed) snapshot else snapshot.copy(document = snapshot.document.copy(sections = sections).touch())
     }
 
     private fun handleTab(snapshot: EditorSnapshot, outdent: Boolean): EditorSnapshot {

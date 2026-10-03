@@ -1,5 +1,16 @@
 # Slate R2 release notes
 
+## Development update — roadmap completion pass
+
+- Added cross-section text replacement while preserving the following section's page configuration.
+- Added continuous, next-page, odd-page, and even-page section starts plus custom page dimensions.
+- Added table row/column removal and repeating header-row controls.
+- Added tappable, persistent checklist state.
+- Added a direct drag handle for precise picture sizing.
+- Added DOCX numbering definitions, header/footer parts, repeating table headers, and embedded-picture relationships.
+- Added DOCX header/footer import and real picture rasterization in PDF and print output.
+- Added page and object accessibility semantics and a formal all-form-factor acceptance matrix.
+
 ## Development update — object selection
 
 - Added first-class table and picture selection state without polluting undo history.

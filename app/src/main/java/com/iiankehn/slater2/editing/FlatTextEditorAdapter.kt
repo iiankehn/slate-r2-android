@@ -66,6 +66,11 @@ class FlatTextEditorAdapter(initial: WordProcessingDocument) {
         return state()
     }
 
+    fun toggleChecklistItem(paragraphId: String): FlatEditorState {
+        session.execute(DocumentCommand.ToggleChecklistItem(paragraphId))
+        return state()
+    }
+
     fun handleTab(start: Int, end: Int, outdent: Boolean): FlatEditorState {
         session.updateSelection(DocumentSelection(index.position(start), index.position(end)))
         session.execute(DocumentCommand.HandleTab(outdent))

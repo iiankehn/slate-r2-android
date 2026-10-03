@@ -225,6 +225,7 @@ data class ListStyle(
     val kind: ListKind,
     val level: Int = 0,
     val startAt: Int = 1,
+    val checked: Boolean = false,
 ) {
     init {
         require(level in 0..8) { "List nesting must be between zero and eight." }

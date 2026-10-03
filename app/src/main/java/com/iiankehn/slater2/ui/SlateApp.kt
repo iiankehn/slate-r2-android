@@ -495,6 +495,7 @@ private fun WordProcessorWorkspace(
                         onUndo = { publish(editor.undo()) },
                         onRedo = { publish(editor.redo()) },
                         onTab = ::handleTab,
+                        onToggleChecklistItem = { id -> publish(editor.toggleChecklistItem(id)) },
                         onUpdateTableCell = { id, row, column, text -> publish(editor.updateTableCell(id, row, column, text)) },
                         onResizeTable = { id, rows, columns -> publish(editor.resizeTable(id, rows, columns)) },
                         onDeleteTableRow = { id, row -> publish(editor.deleteTableRow(id, row)) },
@@ -871,6 +872,7 @@ private fun DocumentCanvas(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onTab: (Boolean) -> Unit,
+    onToggleChecklistItem: (String) -> Unit,
     onUpdateTableCell: (String, Int, Int, String) -> Unit,
     onResizeTable: (String, Int, Int) -> Unit,
     onDeleteTableRow: (String, Int) -> Unit,
@@ -988,7 +990,7 @@ private fun DocumentCanvas(
                             },
                             )
                         }
-                        ListMarkerOverlay(document, layout, pageIndex)
+                        ListMarkerOverlay(document, layout, pageIndex, onToggleChecklistItem)
                     }
                 }
                 Text(
@@ -1054,7 +1056,7 @@ internal fun paragraphListMarkers(document: WordProcessingDocument): Map<String,
             ((list.level + 1)..8).forEach { level -> counters[level] = 0; kinds[level] = null }
             val marker = when (list.kind) {
                 ListKind.Bulleted -> listOf("•", "◦", "▪")[list.level % 3]
-                ListKind.Checklist -> "☐"
+                ListKind.Checklist -> if (list.checked) "☑" else "☐"
                 ListKind.Numbered -> {
                     counters[list.level] = if (kinds[list.level] == ListKind.Numbered) counters[list.level] + 1 else list.startAt
                     "${counters[list.level]}."
@@ -1067,7 +1069,12 @@ internal fun paragraphListMarkers(document: WordProcessingDocument): Map<String,
 }
 
 @Composable
-private fun ListMarkerOverlay(document: WordProcessingDocument, layout: DocumentLayout, pageIndex: Int) {
+private fun ListMarkerOverlay(
+    document: WordProcessingDocument,
+    layout: DocumentLayout,
+    pageIndex: Int,
+    onToggleChecklistItem: (String) -> Unit,
+) {
     val markers = remember(document) { paragraphListMarkers(document) }
     if (markers.isEmpty()) return
     val page = layout.pages[pageIndex]
@@ -1082,7 +1089,9 @@ private fun ListMarkerOverlay(document: WordProcessingDocument, layout: Document
                 val y = (fragment.bounds.top * scale).coerceAtLeast(0f)
                 Text(
                     marker.text,
-                    modifier = Modifier.offset(x.dp, y.dp),
+                    modifier = Modifier.offset(x.dp, y.dp).clickable {
+                        if (marker.text == "☐" || marker.text == "☑") onToggleChecklistItem(fragment.blockId)
+                    }.semantics { contentDescription = if (marker.text == "☑") "Checked checklist item" else "Checklist item" },
                     color = PaperText,
                     fontSize = (11f * scale).coerceIn(9f, 18f).sp,
                     fontWeight = FontWeight.Medium,

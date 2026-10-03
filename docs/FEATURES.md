@@ -6,17 +6,17 @@ Status values describe the development tree, not a public release.
 |---|---|---|
 | Start center | Implemented with blank/template/open/recent flows | Search, pinned templates, cloud-provider shortcuts |
 | Local documents and recovery | Room v3, versioned R2 payload, migration, bounded checkpoints | Transaction-level crash simulations |
-| Page setup | Interactive size, margins, orientation, 1–4 columns, next-page section breaks, inherited setup, and removable boundaries | Custom sizes and continuous/odd/even section starts |
-| Editing commands | Multi-paragraph replace/delete/format commands, section insertion/boundary deletion, and table/picture object selection with keyboard deletion | Cross-section range replacement |
+| Page setup | Interactive standard/custom sizes, margins, orientation, 1–4 columns, continuous/next/odd/even section starts, inherited setup, and removable boundaries | Section-specific footnote and line-number controls |
+| Editing commands | Multi-paragraph and cross-section replace/delete/format commands, section insertion/boundary deletion, interactive checklists, and table/picture object selection with keyboard deletion | Tracked changes and comments |
 | Selection and history | UI-routed logical selections with transactional undo/redo | Object and cross-section selections |
 | Paragraphs and character runs | IME diffs route through the R2 engine; plain-text tabs and paragraph alignment render in the page editor | Tab stops, language runs, and advanced typography |
 | Named styles | Heading, quote, and normal command application | Style gallery, inheritance, document themes |
-| Lists | Visible bullet, numbered, and checklist markers; nine nesting levels; ribbon indent/outdent; Tab/Shift+Tab nesting; undo/redo | Checked-state interaction, custom numbering formats, and DOCX numbering-definition fidelity |
-| Tables | Structured insertion, direct cell editing, row/column growth, selectable object frame, keyboard deletion, undo/redo, DOCX import/export, layout measurement | Row/column removal, merge, repeat headers, resize handles, keyboard cell navigation |
-| Images | Android document-provider insertion, durable URI permission, inline preview, selectable object frame, keyboard deletion, resizing, wrapping modes, accessibility descriptions, and undo/redo | Crop, drag positioning, and true floating-object layout |
-| Pagination | Deterministic stacked editable pages, page-aware text ranges and objects, clickable thumbnails, columns, editable repeated headers/footers, tables, inline images, and next-page sections | Precise floating-object placement and continuous/odd/even section starts |
-| DOCX | Structural paragraphs/runs/styles/tables/page setup/columns/link import and structured export | Embedded media, numbering definitions, headers/footers, fidelity fixtures |
-| PDF and printing | Shared deterministic layout geometry | Font embedding and image rasterization |
+| Lists | Visible bullet, numbered, and tappable checklist markers; nine nesting levels; ribbon indent/outdent; Tab/Shift+Tab nesting; undo/redo; DOCX numbering-definition export | Custom numbering-format editor and third-party numbering fidelity |
+| Tables | Structured insertion, direct cell editing, row/column growth and removal, repeating headers, selectable object frame, keyboard deletion, undo/redo, DOCX import/export, layout measurement | Cell merge and richer keyboard cell navigation |
+| Images | Android document-provider insertion, durable URI permission, inline preview, selectable object frame, keyboard deletion, drag resizing, wrapping modes, accessibility descriptions, DOCX embedding, PDF rasterization, and undo/redo | Crop, drag positioning, imported-media extraction, and true floating-object layout |
+| Pagination | Deterministic stacked editable pages, page-aware text ranges and objects, clickable thumbnails, columns, editable repeated headers/footers, tables, inline images, and continuous/next/odd/even sections | Precise floating-object placement |
+| DOCX | Structural paragraphs/runs/styles/tables/page setup/columns/link import; numbering, embedded-media, repeating-table-header, and header/footer export; header/footer import | Imported-media extraction and broader fidelity fixtures |
+| PDF and printing | Shared deterministic layout geometry with image rasterization | Explicit font-file embedding controls |
 | Ribbon and page workspace | Independent R2 surface implemented | Connect every advanced command to the editing engine |
 | Phone workspace | Compact persistent ribbon and fit-width page | Complete compact word-processing workflow |
 | Tablet/foldable | Stacked multi-page editor, ruler, persistent clickable navigation | Collapsible inspector and drag-based page objects |
@@ -25,7 +25,7 @@ Status values describe the development tree, not a public release.
 
 ## Current limitations
 
-The canvas now renders deterministic stacked pages with separately editable text ranges, page-aware objects, clickable thumbnails, live current-page status, next-page sections, and editable repeated headers and footers while preserving one global document history. Tables and pictures have selectable object frames with touch/mouse focus and hardware-keyboard deletion; tables support direct cell editing and growth, while pictures render from document-provider URIs and expose size, wrapping, accessibility-description, and deletion controls. Cross-section range replacement, exact visual line placement, drag handles, table merge/removal commands, and true floating-object placement remain unfinished. DOCX import preserves the supported structural subset but embedded media, numbering definitions, and imported headers/footers still require fidelity work. These are release blockers, not hidden compatibility claims.
+The canvas renders deterministic stacked pages with separately editable text ranges, page-aware objects, clickable thumbnails, live current-page status, custom page sizes, all common section-start modes, and editable repeated headers and footers while preserving one global document history. Tables and pictures have selectable object frames with touch/mouse focus and hardware-keyboard deletion; tables support direct cell editing, growth, removal, and repeating headers, while pictures expose drag resizing, wrapping, accessibility descriptions, DOCX embedding, PDF rasterization, and deletion controls. True floating-object placement, text exclusion around positioned objects, table cell merging, and extraction of embedded pictures from imported DOCX files remain unfinished. Signed publication also remains dependent on repository signing secrets.
 
 ## Input contract
 

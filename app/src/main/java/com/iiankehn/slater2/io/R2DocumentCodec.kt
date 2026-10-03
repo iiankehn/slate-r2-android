@@ -10,7 +10,7 @@ import java.util.Base64
 /** Versioned, bounded storage format for the complete R2 document model. */
 object R2DocumentCodec {
     private const val MAGIC = 0x534C5232
-    private const val VERSION = 2
+    private const val VERSION = 3
     private const val MAX_PAYLOAD_BYTES = 32 * 1024 * 1024
     private const val MAX_COLLECTION_SIZE = 100_000
     private const val MAX_STRING_BYTES = 8 * 1024 * 1024
@@ -69,8 +69,8 @@ object R2DocumentCodec {
     }
 
     private fun DataInputStream.readSection(version: Int) = DocumentSection(
-        page = readPage(version), blocks = readList { readBlock() }, header = readList { readParagraph() },
-        footer = readList { readParagraph() },
+        page = readPage(version), blocks = readList { readBlock(version) }, header = readList { readParagraph(version) },
+        footer = readList { readParagraph(version) },
         start = if (version == 1) {
             if (readBoolean()) SectionStart.NextPage else SectionStart.Continuous
         } else readEnum(),
@@ -108,13 +108,13 @@ object R2DocumentCodec {
         }
     }
 
-    private fun DataInputStream.readBlock(): DocumentBlock = when (readUnsignedByte()) {
-        1 -> readParagraph()
+    private fun DataInputStream.readBlock(version: Int): DocumentBlock = when (readUnsignedByte()) {
+        1 -> readParagraph(version)
         2 -> {
             val id = readString(); val headerRows = readInt()
             TableBlock(id, readList { TableRow(readList {
                 val columnSpan = readInt(); val rowSpan = readInt()
-                TableCell(readList { readParagraph() }, columnSpan, rowSpan)
+                TableCell(readList { readParagraph(version) }, columnSpan, rowSpan)
             }) }, headerRows)
         }
         3 -> ImageBlock(readString(), readString(), readString(), readNullableFloat(), readNullableFloat(), readEnum())
@@ -125,7 +125,7 @@ object R2DocumentCodec {
         writeString(value.id); writeList(value.runs) { writeRun(it) }; writeParagraphStyle(value.style)
     }
 
-    private fun DataInputStream.readParagraph() = ParagraphBlock(readString(), readList { readRun() }, readParagraphStyle())
+    private fun DataInputStream.readParagraph(version: Int) = ParagraphBlock(readString(), readList { readRun() }, readParagraphStyle(version))
 
     private fun DataOutputStream.writeRun(value: TextRun) {
         writeString(value.text)
@@ -145,15 +145,15 @@ object R2DocumentCodec {
         writeInt(namedStyle.ordinal); writeInt(alignment.ordinal); writeFloat(lineSpacing)
         writeFloat(spaceBeforePoints); writeFloat(spaceAfterPoints); writeFloat(startIndentPoints)
         writeFloat(endIndentPoints); writeFloat(firstLineIndentPoints); writeBoolean(keepWithNext); writeBoolean(pageBreakBefore)
-        writeBoolean(list != null); list?.let { writeInt(it.kind.ordinal); writeInt(it.level); writeInt(it.startAt) }
+        writeBoolean(list != null); list?.let { writeInt(it.kind.ordinal); writeInt(it.level); writeInt(it.startAt); writeBoolean(it.checked) }
     }
 
-    private fun DataInputStream.readParagraphStyle(): ParagraphStyle {
+    private fun DataInputStream.readParagraphStyle(version: Int): ParagraphStyle {
         val named = readEnum<NamedParagraphStyle>(); val alignment = readEnum<ParagraphAlignment>()
         val lineSpacing = readFloat(); val before = readFloat(); val after = readFloat()
         val start = readFloat(); val end = readFloat(); val first = readFloat()
         val keep = readBoolean(); val breakBefore = readBoolean()
-        val list = if (readBoolean()) ListStyle(readEnum(), readInt(), readInt()) else null
+        val list = if (readBoolean()) ListStyle(readEnum(), readInt(), readInt(), if (version >= 3) readBoolean() else false) else null
         return ParagraphStyle(named, alignment, lineSpacing, before, after, start, end, first, keep, breakBefore, list)
     }
 

@@ -160,6 +160,21 @@ class DocumentEditingEngineTest {
     }
 
     @Test
+    fun checklistItemsToggleWithoutChangingTheirText() {
+        val listed = engine.execute(
+            snapshot("Task").select(position(0, 0), position(0, 4)),
+            DocumentCommand.ToggleList(ListKind.Checklist),
+        ).snapshot
+        val paragraph = listed.document.sections.single().blocks.single() as ParagraphBlock
+
+        val checked = engine.execute(listed, DocumentCommand.ToggleChecklistItem(paragraph.id)).snapshot
+
+        val updated = checked.document.sections.single().blocks.single() as ParagraphBlock
+        assertTrue(updated.style.list?.checked == true)
+        assertEquals("Task", updated.runs.single().text)
+    }
+
+    @Test
     fun sectionBreakSplitsAtCaretAndHeaderFooterChangesAreUndoable() {
         val session = DocumentEditorSession(snapshot("AlphaBeta").select(position(0, 5)), engine)
 

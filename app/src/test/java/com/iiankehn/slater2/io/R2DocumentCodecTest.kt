@@ -12,7 +12,7 @@ class R2DocumentCodecTest {
             sections = listOf(DocumentSection(
                 page = PageSetup(PageSize.A4, PageOrientation.Landscape, columns = 2),
                 blocks = listOf(
-                    ParagraphBlock("heading", listOf(TextRun("Results", CharacterStyle(bold = true))), ParagraphStyle(namedStyle = NamedParagraphStyle.Heading1)),
+                    ParagraphBlock("heading", listOf(TextRun("Results", CharacterStyle(bold = true))), ParagraphStyle(namedStyle = NamedParagraphStyle.Heading1, list = ListStyle(ListKind.Checklist, checked = true))),
                     TableBlock("table", listOf(TableRow(listOf(TableCell(), TableCell()))), 1),
                     ImageBlock("chart", "content://chart", "Sales chart", 180f, 120f),
                 ),
