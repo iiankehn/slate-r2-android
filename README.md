@@ -1,69 +1,35 @@
-# Slate Forge by CORE
+# Slate Forge historical repository
 
-Slate Forge (R2) is a native, local-first word processor for Android. It is designed for phones, tablets, foldables, and Googlebook Android devices, with first-class touch, stylus, mouse, trackpad, and hardware-keyboard input.
+Slate Notes and Slate Forge have been unified into **Slate**, one adaptive Android writing application maintained at [`iiankehn/slate-android`](https://github.com/iiankehn/slate-android).
 
-> Slate Forge is a separate product, not the next version of Slate Notes. The two applications use different packages, repositories, release lines, and update channels and can be installed together.
+This repository preserves the former standalone Forge code and its history. Active development, issues, documentation, CI, downloads, and monthly releases now belong to the unified repository.
 
-## Project status
+## What changed
 
-The Slate R2 baseline is feature-complete and in release-candidate validation. The first official signed monthly release is pending repository signing credentials and the documented installation smoke check.
+- Slate keeps the existing `com.iiankehn.slate` package and signing identity.
+- Every new document begins adaptive and appears as a Note for ordinary writing.
+- Page setup, sections, headers, footers, structured tables, or page breaks promote it to Forge.
+- Length alone never selects Forge.
+- The Forge-derived ribbon and page workspace is now the shared interface.
+- `.slx` remains the portable rich-note format; `.slxf` preserves the full word-processing model.
+- ARM64 and x86_64 compatibility are verified in the unified GitHub Actions build.
 
-Visit the [Slate website](https://slate.iiankehn.com/) to compare the distinct R1 and R2 products, open their repositories, and find official downloads.
+## Migrate from standalone Forge
 
-The R2 baseline includes:
+The former Forge app uses package `com.iiankehn.slater2`, so Android cannot merge its private database directly into unified Slate.
 
-- a distinct `com.iiankehn.slater2` Android application;
-- native Kotlin and Jetpack Compose targeting Android 12 and newer;
-- an independent R2 start center and responsive word-processing workspace;
-- a keyboard-safe command ribbon, page canvas, ruler, navigation pane, format inspector, and document status bar;
-- Room v3 persistence with versioned R2 payloads, automatic legacy-row promotion, and bounded recovery checkpoints;
-- a device-independent paginated document model with sections, page setup, margins, columns, paragraphs, text runs, lists, tables, and images;
-- an immutable editing engine with logical document positions, multi-paragraph selections, formatting commands, and transactional undo/redo;
-- IME-safe text-diff routing, real page-break/list/page-setup commands, and Ctrl+B/I/U/Z/Y shortcuts;
-- deterministic pagination shared by page counts, PDF, and Android printing;
-- structured DOCX export for styled runs, tables, sections, page setup, and columns;
-- deterministic workspace profiles for phone, tablet, foldable, and Googlebook Android layouts;
-- explicit touch, stylus, mouse/trackpad, and hardware-keyboard capability modeling;
-- architecture-neutral Kotlin code suitable for ARM64 and x86_64 devices;
-- independent CI and monthly R2 release automation.
-- lossless Forge-native `.slxf` documents plus shared `.slx` rich-text interchange with Slate Notes;
-- local **Continue in Slate Forge** handoff through scoped Android content URIs.
+1. Open each important document in standalone Forge.
+2. Export full documents as `.slxf`; use `.slx` only when portable note compatibility is preferred.
+3. Install unified Slate from the [official release page](https://github.com/iiankehn/slate-android/releases/latest).
+4. Import the exported files and verify them before removing the old app.
 
-## Product direction
+Keep the exports until migration is confirmed. Existing Slate Notes users can install unified Slate in place without uninstalling.
 
-R2 is intended to become a complete word processor rather than a larger notes app. Its work includes:
+## Current project
 
-- page layout, pagination, sections, headers, footers, columns, and print-aware units;
-- named styles, advanced paragraph controls, typography, lists, tabs, and spacing;
-- resizable tables and images with text wrapping;
-- deeper document navigation, live outline mapping, functional rulers and inspectors, and an extensible ribbon;
-- higher-fidelity DOCX interchange and deterministic PDF/print output;
-- responsive workspaces across all supported form factors and input methods.
+- [Unified source and documentation](https://github.com/iiankehn/slate-android)
+- [Downloads](https://github.com/iiankehn/slate-android/releases/latest)
+- [Issues](https://github.com/iiankehn/slate-android/issues/new/choose)
+- [Slate website](https://slate.iiankehn.com/)
 
-See [Product](docs/PRODUCT.md), [Architecture](docs/ARCHITECTURE.md), [Features](docs/FEATURES.md), [Slate formats](docs/SLATE_FORMATS.md), [Visual identity](docs/BRAND.md), and [Roadmap](docs/ROADMAP.md).
-
-## Build
-
-The project uses JDK 17, Gradle 8.13, Android Gradle Plugin 8.13.2, Kotlin 2.3.10, and Android SDK 36.
-
-```shell
-gradle --no-daemon testDebugUnitTest lintDebug assembleDebug
-```
-
-GitHub Actions runs the same verification for every push and pull request and checks that any packaged native library supplies both ARM64 and x86_64 variants.
-
-## Supported architecture
-
-R2's application code is ABI-neutral. CI inspects the built APK and requires every packaged native dependency to include both ARM64 and x86_64 variants.
-
-## Privacy baseline
-
-Documents remain in app-private local storage unless the user explicitly imports, exports, shares, or prints them. R2 requires no account and includes no advertising, behavioral analytics, telemetry, or background update polling. See [Privacy](docs/PRIVACY.md).
-
-## Contributing and reporting
-
-- Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
-- Use [GitHub Issues](https://github.com/iiankehn/slate-r2-android/issues/new/choose) for reproducible bugs and R2 feature proposals.
-- Read [SECURITY.md](SECURITY.md) before reporting a vulnerability.
-
-Never attach private writing, credentials, signing material, or unredacted personal information to a public issue.
+Do not open new product work in this historical repository.

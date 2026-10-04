@@ -29,48 +29,32 @@ themeButton?.addEventListener("click", () => {
   syncThemeControl();
 });
 
-const products = {
-  r1: {
-    repo: "iiankehn/slate-android",
-    fallback: "https://github.com/iiankehn/slate-android/releases",
-    readyCopy: "Latest signed monthly APK with verified update metadata."
-  },
-  r2: {
-    repo: "iiankehn/slate-r2-android",
-    fallback: "https://github.com/iiankehn/slate-r2-android/releases",
-    readyCopy: "Latest signed monthly R2 APK."
-  }
-};
-
-const setProduct = (key, selector, value) => {
-  document.querySelectorAll(`[data-product="${key}"][data-${selector}]`).forEach((node) => {
+const setSlate = (selector, value) => {
+  document.querySelectorAll(`[data-product="slate"][data-${selector}]`).forEach((node) => {
     if (selector.endsWith("-link")) node.href = value;
     else node.textContent = value;
   });
 };
 
-Object.entries(products).forEach(async ([key, product]) => {
+(async () => {
   try {
-    const response = await fetch(`https://api.github.com/repos/${product.repo}/releases/latest`, {
+    const response = await fetch("https://api.github.com/repos/iiankehn/slate-android/releases/latest", {
       headers: { Accept: "application/vnd.github+json" }
     });
     if (!response.ok) throw new Error("No public release");
     const release = await response.json();
     const apk = release.assets?.find((asset) => asset.name.toLowerCase().endsWith(".apk"));
     if (!apk) throw new Error("No APK asset");
-    setProduct(key, "release-link", apk.browser_download_url);
-    setProduct(key, "release-version", release.name || release.tag_name);
-    setProduct(key, "release-status", "Signed release available");
-    setProduct(key, "download-copy", product.readyCopy);
+    setSlate("release-link", apk.browser_download_url);
+    setSlate("release-version", release.name || release.tag_name);
+    setSlate("release-status", "Signed release available");
+    setSlate("download-copy", "Latest signed monthly APK with verified update metadata.");
     const checksum = release.assets?.find((asset) => asset.name.toLowerCase().endsWith(".sha256"));
-    if (checksum) setProduct(key, "checksum-link", checksum.browser_download_url);
-    document.querySelectorAll(`[data-product="${key}"]`).forEach((node) => {
-      const card = node.closest(".product-card");
-      card?.querySelector(".status-dot")?.classList.replace("pending", "live");
+    if (checksum) setSlate("checksum-link", checksum.browser_download_url);
+    document.querySelectorAll('[data-product="slate"]').forEach((node) => {
+      node.closest(".product-card")?.querySelector(".status-dot")?.classList.replace("pending", "live");
     });
   } catch {
-    document.querySelectorAll(`[data-product="${key}"][data-release-link]`).forEach((node) => {
-      if (!node.href) node.href = product.fallback;
-    });
+    // Static links already point to the official release page.
   }
-});
+})();
