@@ -16,6 +16,10 @@ object R2DocumentCodec {
     private const val MAX_STRING_BYTES = 8 * 1024 * 1024
 
     fun encode(document: WordProcessingDocument): String {
+        return Base64.getEncoder().encodeToString(encodeBytes(document))
+    }
+
+    fun encodeBytes(document: WordProcessingDocument): ByteArray {
         val bytes = ByteArrayOutputStream().also { output ->
             DataOutputStream(output).use { data ->
                 data.writeInt(MAGIC)
@@ -27,12 +31,16 @@ object R2DocumentCodec {
             }
         }.toByteArray()
         require(bytes.size <= MAX_PAYLOAD_BYTES) { "R2 document exceeds the 32 MB storage limit." }
-        return Base64.getEncoder().encodeToString(bytes)
+        return bytes
     }
 
     fun decode(payload: String): WordProcessingDocument {
         val bytes = runCatching { Base64.getDecoder().decode(payload) }
             .getOrElse { throw IllegalArgumentException("R2 document payload is not valid Base64.", it) }
+        return decodeBytes(bytes)
+    }
+
+    fun decodeBytes(bytes: ByteArray): WordProcessingDocument {
         require(bytes.size <= MAX_PAYLOAD_BYTES) { "R2 document exceeds the 32 MB storage limit." }
         return DataInputStream(ByteArrayInputStream(bytes)).use { data ->
             require(data.readInt() == MAGIC) { "R2 document has an invalid signature." }

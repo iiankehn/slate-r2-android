@@ -1,7 +1,7 @@
 package com.iiankehn.slater2.model
 
 /**
- * Device-independent document model for Slate R2.
+ * Device-independent document model for Slate Forge (R2).
  *
  * Dimensions are stored in points so the model is stable across Android display densities and
  * maps directly to PDF and print units. UI code is responsible for converting points to pixels.
@@ -56,7 +56,7 @@ data class PageSetup(
     val customHeightPoints: Float? = null,
 ) {
     init {
-        require(columns in 1..4) { "Slate R2 supports between one and four text columns." }
+        require(columns in 1..4) { "Slate Forge supports between one and four text columns." }
         require(columnSpacingPoints >= 0f) { "Column spacing cannot be negative." }
         require((customWidthPoints == null) == (customHeightPoints == null)) { "Custom page dimensions must be supplied together." }
         require(customWidthPoints == null || customWidthPoints in 144f..1440f) { "Custom page width must be between 2 and 20 inches." }

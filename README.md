@@ -1,8 +1,8 @@
-# Slate R2 by CORE
+# Slate Forge by CORE
 
-Slate R2 is a native, local-first word processor for Android. It is designed for phones, tablets, foldables, and Googlebook Android devices, with first-class touch, stylus, mouse, trackpad, and hardware-keyboard input.
+Slate Forge (R2) is a native, local-first word processor for Android. It is designed for phones, tablets, foldables, and Googlebook Android devices, with first-class touch, stylus, mouse, trackpad, and hardware-keyboard input.
 
-> R2 is a separate product, not the next version of Slate R1. The two applications use different packages, repositories, release lines, and update channels and can be installed together.
+> Slate Forge is a separate product, not the next version of Slate Notes. The two applications use different packages, repositories, release lines, and update channels and can be installed together.
 
 ## Project status
 
@@ -26,6 +26,8 @@ The R2 baseline includes:
 - explicit touch, stylus, mouse/trackpad, and hardware-keyboard capability modeling;
 - architecture-neutral Kotlin code suitable for ARM64 and x86_64 devices;
 - independent CI and monthly R2 release automation.
+- lossless Forge-native `.slxf` documents plus shared `.slx` rich-text interchange with Slate Notes;
+- local **Continue in Slate Forge** handoff through scoped Android content URIs.
 
 ## Product direction
 
@@ -38,7 +40,7 @@ R2 is intended to become a complete word processor rather than a larger notes ap
 - higher-fidelity DOCX interchange and deterministic PDF/print output;
 - responsive workspaces across all supported form factors and input methods.
 
-See [Product](docs/PRODUCT.md), [Architecture](docs/ARCHITECTURE.md), [Features](docs/FEATURES.md), [Visual identity](docs/BRAND.md), and [Roadmap](docs/ROADMAP.md).
+See [Product](docs/PRODUCT.md), [Architecture](docs/ARCHITECTURE.md), [Features](docs/FEATURES.md), [Slate formats](docs/SLATE_FORMATS.md), [Visual identity](docs/BRAND.md), and [Roadmap](docs/ROADMAP.md).
 
 ## Build
 

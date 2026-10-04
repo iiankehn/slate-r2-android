@@ -13,6 +13,7 @@ data class ImportedDocument(
     val warnings: List<String> = emptyList(),
     val wordProcessingDocument: WordProcessingDocument? = null,
     val embeddedImages: List<ImportedEmbeddedImage> = emptyList(),
+    val slxAssets: List<SlxAsset> = emptyList(),
 )
 
 data class ImportedEmbeddedImage(val blockId: String, val bytes: ByteArray, val extension: String)
@@ -34,6 +35,44 @@ object DocumentFormats {
     }
 
     fun exportText(body: RichTextDocument): ByteArray = body.text.toByteArray(Charsets.UTF_8)
+
+    fun importSlx(bytes: ByteArray): ImportedDocument {
+        val document = SlxCodec.decode(bytes)
+        return ImportedDocument(
+            title = document.title,
+            body = document.body,
+            warnings = document.warnings,
+            slxAssets = document.assets,
+        )
+    }
+
+    fun exportSlx(document: Document, assets: List<SlxAsset> = emptyList()): ByteArray = SlxCodec.encode(
+        SlxDocument(
+            title = document.title,
+            body = document.body,
+            sourceDocumentId = document.id,
+            sourceRevision = document.updatedAtEpochMillis,
+            sourceProduct = "forge",
+            updatedAtEpochMillis = document.updatedAtEpochMillis,
+            assets = assets,
+        ),
+    )
+
+    fun importSlxf(bytes: ByteArray): ImportedDocument {
+        val packageDocument = SlxfCodec.decode(bytes)
+        val document = packageDocument.document
+        return ImportedDocument(
+            title = document.title,
+            body = R2DocumentBridge.toLegacyBody(document),
+            wordProcessingDocument = document,
+            embeddedImages = packageDocument.assets.map { (blockId, asset) -> ImportedEmbeddedImage(blockId, asset.bytes, asset.extension) },
+        )
+    }
+
+    fun exportSlxf(document: Document, assets: Map<String, SlxAsset> = emptyMap()): ByteArray {
+        val forge = document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)
+        return SlxfCodec.encode(SlxfDocument(forge, document.updatedAtEpochMillis, assets))
+    }
 
     fun importMarkdown(bytes: ByteArray, fallbackTitle: String): ImportedDocument {
         require(bytes.size <= MAX_DOCUMENT_BYTES) { "Document is larger than 25 MB." }

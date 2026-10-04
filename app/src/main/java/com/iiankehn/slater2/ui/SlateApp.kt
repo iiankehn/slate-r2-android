@@ -108,6 +108,9 @@ import com.iiankehn.slater2.io.AndroidDocumentActions
 import com.iiankehn.slater2.io.DocumentFormats
 import com.iiankehn.slater2.io.DocxEmbeddedImage
 import com.iiankehn.slater2.io.R2DocumentBridge
+import com.iiankehn.slater2.io.SlxAsset
+import com.iiankehn.slater2.io.SlxCodec
+import com.iiankehn.slater2.io.SlxfCodec
 import com.iiankehn.slater2.editing.CharacterFormat
 import com.iiankehn.slater2.editing.FlatTextEditorAdapter
 import com.iiankehn.slater2.layout.DocumentLayoutEngine
@@ -142,11 +145,13 @@ import java.io.File
 
 private enum class RibbonTab { File, Home, Insert, Layout, Review, View }
 private enum class LayoutAction { Margins, Orientation, Size, Columns }
-private enum class ExportFormat(val extension: String, val mime: String) {
-    Text("txt", "text/plain"),
-    Markdown("md", "text/markdown"),
-    Docx("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-    Pdf("pdf", "application/pdf"),
+private enum class ExportFormat(val label: String, val extension: String, val mime: String) {
+    Slxf("Slate Forge (.slxf)", "slxf", SlxfCodec.MIME_TYPE),
+    Slx("Slate-compatible (.slx)", "slx", SlxCodec.MIME_TYPE),
+    Text("Text", "txt", "text/plain"),
+    Markdown("Markdown", "md", "text/markdown"),
+    Docx("DOCX", "docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    Pdf("PDF", "pdf", "application/pdf"),
 }
 private enum class TemplateKind(val title: String, val description: String, val content: String) {
     Report("Report", "Structured sections", "Executive summary\n\nStart writing your summary here.\n\nBackground\n\nAdd the context for your report.\n\nFindings\n\nDescribe your findings."),
@@ -176,6 +181,8 @@ fun SlateR2App(viewModel: SlateViewModel) {
                         ?: error("Unable to read the selected document.")
                     val title = name.substringBeforeLast('.').ifBlank { "Imported document" }
                     val imported = when (name.substringAfterLast('.', "").lowercase()) {
+                        "slx" -> DocumentFormats.importSlx(bytes)
+                        "slxf" -> DocumentFormats.importSlxf(bytes)
                         "md", "markdown" -> DocumentFormats.importMarkdown(bytes, title)
                         "docx" -> DocumentFormats.importDocx(bytes, title)
                         else -> DocumentFormats.importText(bytes, title)
@@ -196,6 +203,14 @@ fun SlateR2App(viewModel: SlateViewModel) {
             runCatching {
                 withContext(Dispatchers.IO) {
                     val bytes = when (request.format) {
+                        ExportFormat.Slx -> {
+                            val (portableDocument, assets) = collectSharedAssets(context, request.document)
+                            DocumentFormats.exportSlx(portableDocument, assets)
+                        }
+                        ExportFormat.Slxf -> {
+                            val assets = collectForgeAssets(context, request.document)
+                            DocumentFormats.exportSlxf(request.document, assets)
+                        }
                         ExportFormat.Text -> DocumentFormats.exportText(request.document.body)
                         ExportFormat.Markdown -> DocumentFormats.exportMarkdown(request.document.body)
                         ExportFormat.Docx -> {
@@ -256,7 +271,7 @@ fun SlateR2App(viewModel: SlateViewModel) {
                 documents = uiState.documents.filterNot { it.isDeleted || it.isArchived },
                 onNew = ::createBlank,
                 onTemplate = ::createFromTemplate,
-                onImport = { importLauncher.launch(arrayOf("text/plain", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
+                onImport = { importLauncher.launch(arrayOf(SlxCodec.MIME_TYPE, SlxfCodec.MIME_TYPE, "text/plain", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
                 onOpen = { selectedId = it.id },
             )
             else -> WordProcessorWorkspace(
@@ -265,17 +280,23 @@ fun SlateR2App(viewModel: SlateViewModel) {
                 onClose = { selectedId = null },
                 onChange = viewModel::updateDocument,
                 onNew = ::createBlank,
-                onImport = { importLauncher.launch(arrayOf("text/plain", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
+                onImport = { importLauncher.launch(arrayOf(SlxCodec.MIME_TYPE, SlxfCodec.MIME_TYPE, "text/plain", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
                 pendingImageUri = pendingImageUri,
                 onChooseImage = { imageLauncher.launch(arrayOf("image/*")) },
                 onImageConsumed = { pendingImageUri = null },
                 onExport = { export(selected, it) },
+                onSendToNotes = {
+                    runCatching {
+                        val (portableDocument, assets) = collectSharedAssets(context, selected)
+                        AndroidDocumentActions.sendToNotes(context, portableDocument, assets)
+                    }.onFailure { Toast.makeText(context, "Slate Notes is not installed.", Toast.LENGTH_LONG).show() }
+                },
                 onShare = { AndroidDocumentActions.share(context, selected) },
                 onPrint = { AndroidDocumentActions.print(context, selected) },
                 onCheckUpdates = {
                     scope.launch {
                         val message = runCatching { SlateUpdater.checkForUpdate(context) }.fold(
-                            onSuccess = { if (it == null) "Slate R2 is up to date." else "${it.versionName} is available from GitHub." },
+                            onSuccess = { if (it == null) "Slate Forge is up to date." else "${it.versionName} is available from GitHub." },
                             onFailure = { it.message ?: "Unable to check for updates." },
                         )
                         Toast.makeText(context, message, Toast.LENGTH_LONG).show()
@@ -287,22 +308,70 @@ fun SlateR2App(viewModel: SlateViewModel) {
 }
 
 private fun materializeImportedImages(context: android.content.Context, imported: com.iiankehn.slater2.io.ImportedDocument): com.iiankehn.slater2.io.ImportedDocument {
-    if (imported.embeddedImages.isEmpty()) return imported
-    val directory = File(context.filesDir, "imported-docx-media").apply { mkdirs() }
-    val uris = imported.embeddedImages.associate { image ->
+    if (imported.embeddedImages.isEmpty() && imported.slxAssets.isEmpty()) return imported
+    val directory = File(context.filesDir, "imported-slate-media").apply { mkdirs() }
+    val forgeUris = imported.embeddedImages.associate { image ->
         val extension = image.extension.takeIf { it.matches(Regex("[a-zA-Z0-9]{1,8}")) } ?: "bin"
         val file = File(directory, "${image.blockId}-${image.bytes.contentHashCode()}.$extension")
         file.outputStream().use { it.write(image.bytes) }
         image.blockId to Uri.fromFile(file).toString()
     }
+    val sharedUris = imported.slxAssets.associate { asset ->
+        val extension = asset.extension.takeIf { it.matches(Regex("[a-zA-Z0-9]{1,8}")) } ?: "bin"
+        val file = File(directory, "${asset.id}-${asset.bytes.contentHashCode()}.$extension")
+        file.outputStream().use { it.write(asset.bytes) }
+        asset.id to Uri.fromFile(file).toString()
+    }
+    val body = imported.body.copy(ranges = imported.body.ranges.map { range ->
+        val assetId = range.data?.removePrefix("asset:")?.takeIf { range.data?.startsWith("asset:") == true }
+        if (assetId != null && assetId in sharedUris) range.copy(data = sharedUris.getValue(assetId)) else range
+    }).normalized()
     val document = imported.wordProcessingDocument?.let { r2 ->
         r2.copy(sections = r2.sections.map { section ->
             section.copy(blocks = section.blocks.map { block ->
-                if (block is ImageBlock && block.id in uris) block.copy(sourceUri = uris.getValue(block.id)) else block
+                if (block is ImageBlock && block.id in forgeUris) block.copy(sourceUri = forgeUris.getValue(block.id)) else block
             })
         })
     }
-    return imported.copy(wordProcessingDocument = document, embeddedImages = emptyList())
+    return imported.copy(body = body, wordProcessingDocument = document, embeddedImages = emptyList(), slxAssets = emptyList())
+}
+
+private fun collectForgeAssets(context: android.content.Context, document: Document): Map<String, SlxAsset> {
+    val forge = document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)
+    return forge.sections.flatMap { it.blocks }.filterIsInstance<ImageBlock>().mapNotNull { image ->
+        runCatching {
+            val uri = Uri.parse(image.sourceUri)
+            val bytes = if (uri.scheme == "file") File(requireNotNull(uri.path)).readBytes()
+            else context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("Unable to read image")
+            val mime = context.contentResolver.getType(uri) ?: when (File(uri.path.orEmpty()).extension.lowercase()) {
+                "jpg", "jpeg" -> "image/jpeg"
+                "gif" -> "image/gif"
+                "webp" -> "image/webp"
+                else -> "image/png"
+            }
+            val extension = when (mime) { "image/jpeg" -> "jpg"; "image/gif" -> "gif"; "image/webp" -> "webp"; else -> "png" }
+            image.id to SlxAsset(image.id, extension, mime, bytes)
+        }.getOrNull()
+    }.toMap()
+}
+
+private fun collectSharedAssets(context: android.content.Context, document: Document): Pair<Document, List<SlxAsset>> {
+    val sharedBody = document.wordProcessingDocument?.let(R2DocumentBridge::toLegacyBody) ?: document.body
+    val assets = mutableListOf<SlxAsset>()
+    val ranges = sharedBody.ranges.mapIndexed { index, range ->
+        if (range.style != RichTextStyle.Image || range.data.isNullOrBlank()) return@mapIndexed range
+        runCatching {
+            val uri = Uri.parse(range.data)
+            val bytes = if (uri.scheme == "file") File(requireNotNull(uri.path)).readBytes()
+            else context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("Unable to read image")
+            val mime = context.contentResolver.getType(uri) ?: when (File(uri.path.orEmpty()).extension.lowercase()) {
+                "jpg", "jpeg" -> "image/jpeg"; "gif" -> "image/gif"; "webp" -> "image/webp"; else -> "image/png"
+            }
+            val extension = when (mime) { "image/jpeg" -> "jpg"; "image/gif" -> "gif"; "image/webp" -> "webp"; else -> "png" }
+            val id = "image-$index"; assets += SlxAsset(id, extension, mime, bytes); range.copy(data = "asset:$id")
+        }.getOrElse { range }
+    }
+    return document.copy(body = sharedBody.copy(ranges = ranges).normalized()) to assets
 }
 
 @Composable
@@ -319,7 +388,7 @@ private fun StartCenter(
             Surface(color = MaterialTheme.colorScheme.surface) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = if (wide) 40.dp else 20.dp, vertical = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Slate R2", style = MaterialTheme.typography.headlineMedium)
+                        Text("Slate Forge", style = MaterialTheme.typography.headlineMedium)
                         Text("Word processor", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     OutlinedButton(onClick = onImport) { Text("Open document") }
@@ -404,6 +473,7 @@ private fun WordProcessorWorkspace(
     onChooseImage: () -> Unit,
     onImageConsumed: () -> Unit,
     onExport: (ExportFormat) -> Unit,
+    onSendToNotes: () -> Unit,
     onShare: () -> Unit,
     onPrint: () -> Unit,
     onCheckUpdates: () -> Unit,
@@ -494,7 +564,7 @@ private fun WordProcessorWorkspace(
                 onInsertImage = onChooseImage,
                 onLayout = ::updateLayout,
                 onCustomPageSize = { showCustomPageSizeEditor = true },
-                onExport = onExport, onShare = onShare, onPrint = onPrint, onCheckUpdates = onCheckUpdates,
+                onExport = onExport, onSendToNotes = onSendToNotes, onShare = onShare, onPrint = onPrint, onCheckUpdates = onCheckUpdates,
                 showNavigation = showNavigation, showInspector = showInspector,
                 onToggleNavigation = { showNavigation = !showNavigation }, onToggleInspector = { showInspector = !showInspector },
                 onZoom = { zoom = it },
@@ -634,6 +704,7 @@ private fun Ribbon(
     onNew: () -> Unit,
     onOpen: () -> Unit,
     onExport: (ExportFormat) -> Unit,
+    onSendToNotes: () -> Unit,
     onShare: () -> Unit,
     onPrint: () -> Unit,
     onCheckUpdates: () -> Unit,
@@ -648,7 +719,7 @@ private fun Ribbon(
             when (tab) {
                 RibbonTab.File -> {
                     RibbonGroup("Document") { RibbonCommand("New", onNew); RibbonCommand("Open", onOpen) }
-                    RibbonGroup("Export") { ExportMenu(onExport); RibbonCommand("Share", onShare); RibbonCommand("Print", onPrint) }
+                    RibbonGroup("Export") { ExportMenu(onExport); RibbonCommand("Send to Notes", onSendToNotes); RibbonCommand("Share", onShare); RibbonCommand("Print", onPrint) }
                     RibbonGroup("Slate") { RibbonCommand("Updates", onCheckUpdates) }
                 }
                 RibbonTab.Home -> {
@@ -708,7 +779,7 @@ private fun ExportMenu(onExport: (ExportFormat) -> Unit) {
     Box {
         RibbonCommand("Export", { open = true })
         DropdownMenu(open, { open = false }) {
-            ExportFormat.entries.forEach { format -> DropdownMenuItem(text = { Text(format.name) }, onClick = { open = false; onExport(format) }) }
+            ExportFormat.entries.forEach { format -> DropdownMenuItem(text = { Text(format.label) }, onClick = { open = false; onExport(format) }) }
         }
     }
 }

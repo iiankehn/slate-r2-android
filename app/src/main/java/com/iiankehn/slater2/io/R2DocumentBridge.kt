@@ -7,10 +7,17 @@ object R2DocumentBridge {
     fun fromLegacy(document: Document): WordProcessingDocument {
         val body = document.body.normalized()
         val paragraphs = splitParagraphs(body).ifEmpty { listOf(ParagraphBlock(id = "${document.id}-p0")) }
+        val images = body.ranges.filter { it.style == RichTextStyle.Image && !it.data.isNullOrBlank() }.mapIndexed { index, range ->
+            ImageBlock(
+                id = "${document.id}-image-$index",
+                sourceUri = requireNotNull(range.data),
+                description = body.text.substring(range.start.coerceAtMost(body.text.length), range.end.coerceAtMost(body.text.length)),
+            )
+        }
         return WordProcessingDocument(
             id = document.id,
             title = document.title,
-            sections = listOf(DocumentSection(blocks = paragraphs)),
+            sections = listOf(DocumentSection(blocks = paragraphs + images)),
             metadata = DocumentMetadata(
                 createdAtEpochMillis = document.updatedAtEpochMillis,
                 updatedAtEpochMillis = document.updatedAtEpochMillis,
@@ -21,16 +28,28 @@ object R2DocumentBridge {
     fun toLegacyBody(document: WordProcessingDocument): RichTextDocument {
         val text = StringBuilder()
         val ranges = mutableListOf<RichTextRange>()
-        val paragraphs = document.sections.flatMap { it.blocks }.filterIsInstance<ParagraphBlock>()
-        paragraphs.forEachIndexed { paragraphIndex, paragraph ->
-            if (paragraphIndex > 0) text.append('\n')
-            val paragraphStart = text.length
-            paragraph.runs.forEach { run ->
-                val start = text.length; text.append(run.text); val end = text.length
-                if (end > start) ranges += run.style.toLegacyRanges(start, end)
+        document.sections.flatMap { it.blocks }.forEachIndexed { blockIndex, block ->
+            if (blockIndex > 0) text.append('\n')
+            when (block) {
+                is ParagraphBlock -> {
+                    val paragraphStart = text.length
+                    block.runs.forEach { run ->
+                        val start = text.length; text.append(run.text); val end = text.length
+                        if (end > start) ranges += run.style.toLegacyRanges(start, end)
+                    }
+                    val end = text.length
+                    if (end > paragraphStart) block.style.toLegacyStyle()?.let { ranges += RichTextRange(it, paragraphStart, end) }
+                }
+                is ImageBlock -> {
+                    val start = text.length; text.append(block.description.ifBlank { "🖼 Image" })
+                    ranges += RichTextRange(RichTextStyle.Image, start, text.length, block.sourceUri)
+                }
+                is TableBlock -> {
+                    val start = text.length
+                    text.append(block.rows.joinToString("\n") { row -> row.cells.joinToString(" | ") { cell -> cell.blocks.joinToString(" ") { paragraph -> paragraph.runs.joinToString("") { it.text } } } })
+                    if (text.length > start) ranges += RichTextRange(RichTextStyle.Table, start, text.length)
+                }
             }
-            val end = text.length
-            if (end > paragraphStart) paragraph.style.toLegacyStyle()?.let { ranges += RichTextRange(it, paragraphStart, end) }
         }
         return RichTextDocument(text.toString(), ranges).normalized()
     }

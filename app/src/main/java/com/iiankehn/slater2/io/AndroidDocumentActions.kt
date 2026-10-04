@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.pdf.PdfDocument
@@ -15,6 +16,7 @@ import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
 import android.print.PrintManager
+import androidx.core.content.FileProvider
 import com.iiankehn.slater2.model.Document
 import com.iiankehn.slater2.model.DocumentTitlePolicy
 import com.iiankehn.slater2.model.WordProcessingDocument
@@ -22,9 +24,29 @@ import com.iiankehn.slater2.model.ImageBlock
 import com.iiankehn.slater2.layout.DocumentLayoutEngine
 import com.iiankehn.slater2.layout.FragmentKind
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.io.FileOutputStream
 
 object AndroidDocumentActions {
+    fun sendToNotes(context: Context, document: Document, assets: List<SlxAsset> = emptyList()) {
+        requireTrustedTarget(context, "com.iiankehn.slate")
+        val directory = File(context.cacheDir, "handoff").apply { mkdirs() }
+        val file = File(directory, "${document.id}.slx")
+        file.writeBytes(DocumentFormats.exportSlx(document, assets))
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+        context.startActivity(Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, SlxCodec.MIME_TYPE)
+            setPackage("com.iiankehn.slate")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        })
+    }
+
+    private fun requireTrustedTarget(context: Context, targetPackage: String) {
+        require(context.packageManager.checkSignatures(context.packageName, targetPackage) == PackageManager.SIGNATURE_MATCH) {
+            "The installed Slate Notes build is missing or is not signed by the trusted Slate key."
+        }
+    }
+
     fun renderPdf(document: Document): ByteArray {
         val r2 = document.wordProcessingDocument ?: R2DocumentBridge.fromLegacy(document)
         return renderPdf(r2, null)
