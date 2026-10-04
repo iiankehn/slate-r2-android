@@ -129,7 +129,7 @@ object SlxCodec {
                 data.writeString("assets/${asset.id}.${asset.extension.lowercase()}")
                 val digest = asset.bytes.sha256(); data.writeInt(digest.size); data.write(digest)
             }
-            data.writeInt(document.warnings.size); document.warnings.forEach(data::writeString)
+            data.writeInt(document.warnings.size); document.warnings.forEach { warning -> data.writeString(warning) }
         }
     }.toByteArray()
 
@@ -156,7 +156,7 @@ object SlxCodec {
             data.writeString(body.text); data.writeInt(body.ranges.size)
             body.ranges.forEach { range ->
                 data.writeString(range.style.name); data.writeInt(range.start); data.writeInt(range.end)
-                data.writeBoolean(range.data != null); range.data?.let(data::writeString)
+                data.writeBoolean(range.data != null); range.data?.let { value -> data.writeString(value) }
             }
         }
     }.toByteArray()
