@@ -1,10 +1,17 @@
-name: Deploy Slate R2 website
+name: Deploy Slate website
 
 on:
   push:
     branches: [main]
     paths:
-      - "docs/**"
+      - "index.html"
+      - "404.html"
+      - "CNAME"
+      - "robots.txt"
+      - "sitemap.xml"
+      - "assets/**"
+      - "docs/styles.css"
+      - "docs/script.js"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -26,9 +33,15 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/configure-pages@v5
+      - name: Prepare unified Slate website
+        run: |
+          mkdir -p _site/assets _site/docs
+          cp index.html 404.html CNAME robots.txt sitemap.xml _site/
+          cp assets/slate-mascot-primary.png assets/slate-mascot-primary.webp _site/assets/
+          cp docs/styles.css docs/script.js _site/docs/
       - uses: actions/upload-pages-artifact@v4
         with:
-          path: docs
+          path: _site
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
