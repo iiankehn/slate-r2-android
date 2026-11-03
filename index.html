@@ -253,6 +253,14 @@ figcaption { margin-top: .9rem; color: var(--muted); font-size: .84rem; }
   .scene[data-enter] img { animation: screenshot-in 420ms cubic-bezier(.2,.7,.25,1) both; }
   @keyframes screenshot-in { from { transform: translateY(10px) scale(.985); opacity: .6; } }
 }
+
+/* Short captions leave the product captures as the primary content. */
+.scene-copy { display: block; }
+.scene-copy h3 { font-size: clamp(1.4rem, 3vw, 2.5rem); }
+.capture-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(1rem, 3vw, 2.5rem); }
+.capture img { width: 100%; border: 1px solid var(--stage-edge); border-radius: var(--radius); }
+.capture figcaption { color: var(--ink); font-weight: 650; }
+@media (max-width: 620px) { .capture-grid { grid-template-columns: 1fr; } }
 </style>
   <title>Slate Forge · Make room for words</title>
 </head>
@@ -270,7 +278,7 @@ figcaption { margin-top: .9rem; color: var(--muted); font-size: .84rem; }
       <div class="hero-copy">
         <p class="label">Slate Forge for the web</p>
         <h1 id="hero-title">Make room<br> for words.</h1>
-        <p class="intro">Write the draft, shape the page, and finish the document in your browser.</p>
+        <p class="intro">The word processor in your browser.</p>
         <a class="cta" href="https://slate-web.iiankehn.com/">Open Slate Forge <span aria-hidden="true">↗</span></a>
         <p class="fine">Public beta · No account required</p>
       </div>
@@ -297,61 +305,36 @@ figcaption { margin-top: .9rem; color: var(--muted); font-size: .84rem; }
             <button type="button" id="tab-pdf" aria-controls="pdf">Work with PDFs</button>
           </div>
           <article class="scene" id="write">
-            <div class="scene-copy"><h3>Find your flow.</h3><p>Start with a template or a blank document. Style headings, move through long drafts with the outline, or clear the workspace with focus mode.</p></div>
+            <div class="scene-copy"><h3>Draft and format</h3></div>
             <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/outline-preview.jpg" width="1363" height="936" loading="lazy" alt="The document outline lists headings beside a structured draft in Slate Forge.">
           </article>
           <article class="scene" id="layout">
-            <div class="scene-copy"><h3>See the page take shape.</h3><p>Switch between continuous and paged editing. Set margins and orientation, add headers and footers, and see how tables and text flow across pages.</p></div>
+            <div class="scene-copy"><h3>Lay out the page</h3></div>
             <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/slate-forge-live-pages.jpg" width="1363" height="936" loading="lazy" alt="The Slate Forge paged editor shows a table flowing onto a second sheet.">
           </article>
           <article class="scene" id="pdf">
-            <div class="scene-copy"><h3>Work with the PDF you have.</h3><p>Open a PDF, add annotations, or use OCR to extract text from a scan. When your own document is ready, preview it and print or save it as PDF.</p></div>
+            <div class="scene-copy"><h3>Mark up a PDF</h3></div>
             <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/slate-forge-pdf-qa.jpg" width="1363" height="936" loading="lazy" alt="A PDF page is open in Slate Forge with annotation controls in the sidebar.">
           </article>
         </div>
-        <p class="compatibility">Slate Forge imports and exports supported Word and OpenDocument files. Check complex layouts after conversion. <a href="https://slate-web.iiankehn.com/help.html">Read the user guide</a></p>
       </div>
     </section>
 
-    <section class="chapter workflow" id="workflow" aria-labelledby="workflow-title">
+    <section class="chapter appearance" aria-labelledby="gallery-title">
       <div class="shell">
         <div class="chapter-head" data-reveal>
-          <p class="label">03 / A document, start to finish</p>
-          <h2 id="workflow-title">Pick up where<br>you left off.</h2>
+          <h2 id="gallery-title">Make it yours.</h2>
         </div>
-        <div class="editorial-grid">
-          <figure class="editorial-shot" data-reveal>
-            <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/template-chooser-preview.jpg" width="1363" height="936" loading="lazy" alt="The Slate Forge template chooser showing document starting points.">
-            <figcaption>Choose a starting point and make it your own.</figcaption>
+        <div class="capture-grid">
+          <figure class="capture" data-reveal>
+            <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/template-chooser-preview.jpg" width="1363" height="936" loading="lazy" alt="The template picker open over the Slate Forge editor, showing several document starting points.">
+            <figcaption>Start with a template</figcaption>
           </figure>
-          <ol class="steps" data-reveal>
-            <li><h3>Give the draft a head start.</h3><p>Start with a report, letter, proposal, or creative brief. If the work already exists, open a supported Word, OpenDocument, HTML, or text file.</p></li>
-            <li><h3>Find the passage you need.</h3><p>Jump between headings with the outline, update repeated wording with find and replace, and use document statistics to track a writing goal.</p></li>
-            <li><h3>Check the finished pages.</h3><p>Open page preview before printing or saving as PDF. Export an editable copy when someone else needs to keep working on it.</p></li>
-          </ol>
+          <figure class="capture" data-reveal>
+            <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/personal-appearance-preview.jpg" width="1363" height="936" loading="lazy" alt="Slate Forge’s dark editor with a violet accent.">
+            <figcaption>Customize the workspace</figcaption>
+          </figure>
         </div>
-      </div>
-    </section>
-
-    <section class="chapter appearance" aria-labelledby="appearance-title">
-      <div class="shell editorial-grid">
-        <div class="appearance-copy" data-reveal>
-          <p class="label">04 / Make it yours</p>
-          <h2 id="appearance-title">Set the mood<br>for writing.</h2>
-          <p>Pick an editor theme or follow your system appearance. Change the accent, switch on the dark page view, or fit the sheet to your window.</p>
-          <p class="fine">Dark page view is a screen preference. Your document’s original colors carry through to printing and exports.</p>
-        </div>
-        <figure class="editorial-shot" data-reveal>
-          <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/personal-appearance-preview.jpg" width="1363" height="936" loading="lazy" alt="Slate Forge with a dark editor theme and a violet accent.">
-          <figcaption>A dark workspace with a custom accent.</figcaption>
-        </figure>
-      </div>
-    </section>
-
-    <section class="chapter local" id="local" aria-labelledby="local-title">
-      <div class="shell local-grid" data-reveal>
-        <div><p class="label">On-device saving</p><h2 id="local-title">Your work stays<br>with you.</h2></div>
-        <div class="local-copy"><p>Slate Forge saves your work in this browser on this device. Export a workspace backup when you want to move to another device or keep a separate copy. You can password-protect the backup.</p><p class="fine">Clearing browser data can remove your saved workspace. Keep an independent backup of important work.</p></div>
       </div>
     </section>
   </main>
