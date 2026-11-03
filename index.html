@@ -68,9 +68,9 @@ a { color: inherit; text-underline-offset: .22em; }
 @supports (backdrop-filter: blur(20px)) {
   .bar { background: var(--glass); backdrop-filter: blur(20px); }
 }
-.nav, .nav nav, .footer nav { display: flex; align-items: center; gap: clamp(.85rem, 3vw, 2.4rem); }
+.nav, .nav nav { display: flex; align-items: center; gap: clamp(.85rem, 3vw, 2.4rem); }
 .nav { min-height: 4rem; justify-content: space-between; }
-.nav a, .footer a { display: inline-flex; align-items: center; min-height: 44px; }
+.nav a { display: inline-flex; align-items: center; min-height: 44px; }
 .nav nav a { font-size: .88rem; font-weight: 600; text-decoration: none; }
 .nav nav a:hover { text-decoration: underline; }
 .brand img { width: 244px; }
@@ -112,11 +112,7 @@ figcaption { margin-top: .9rem; color: var(--muted); font-size: .84rem; }
 .local h2 { margin-top: .75rem; }
 .local-copy { grid-column: 8 / -1; }
 .local-copy .fine { margin-top: 1rem; }
-footer { border-top: 1px solid var(--rule); }
-.footer { padding-block: 1.6rem 2.5rem; display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1.5rem; }
 .footer-name { font-weight: 750; margin-right: auto; }
-.footer nav { flex-wrap: wrap; }
-.footer .fine { flex-basis: 100%; }
 
 @media (min-width: 940px) {
   h1 br { display: none; }
@@ -152,15 +148,11 @@ footer { border-top: 1px solid var(--rule); }
 .steps li { padding: 1rem 0; border-bottom: 1px solid var(--rule); }
 .steps li::marker { color: var(--link); font-weight: 750; }
 .steps h3 { font-size: clamp(1.25rem, 2.1vw, 1.8rem); letter-spacing: -.035em; line-height: 1.15; }
-.steps p, .appearance-copy > p:not(.label), .answers p { margin-top: .6rem; color: var(--muted); }
-.appearance, .questions { background: var(--surface); }
-.appearance-copy, .questions .editorial-grid > :first-child { grid-column: span 5; }
-.appearance h2, .questions h2 { margin-top: .75rem; font-size: clamp(2.8rem, 5vw, 5rem); }
+.steps p, .appearance-copy > p:not(.label) { margin-top: .6rem; color: var(--muted); }
+.appearance { background: var(--surface); }
+.appearance-copy { grid-column: span 5; }
+.appearance h2 { margin-top: .75rem; font-size: clamp(2.8rem, 5vw, 5rem); }
 .appearance-copy > p:not(.label) { max-width: 38ch; }
-.answers { grid-column: span 7; border-top: 1px solid var(--rule); }
-.answers details { border-bottom: 1px solid var(--rule); padding-block: .35rem; }
-.answers summary { align-content: center; min-height: 48px; cursor: pointer; font-weight: 650; }
-.answers p { margin: 0 0 .9rem; }
 @media (max-width: 760px) {
   .editorial-grid > * { grid-column: 1 / -1 !important; }
 }
@@ -277,29 +269,8 @@ footer { border-top: 1px solid var(--rule); }
         <div class="local-copy"><p>Slate Forge saves your work in this browser on this device. Export a workspace backup when you want to move to another device or keep a separate copy. You can password-protect the backup.</p><p class="fine">Clearing browser data can remove your saved workspace. Keep an independent backup of important work.</p></div>
       </div>
     </section>
-    <section class="chapter questions" aria-labelledby="questions-title">
-      <div class="shell editorial-grid">
-        <div data-reveal><p class="label">Good to know</p><h2 id="questions-title">Before you begin.</h2></div>
-        <div class="answers" data-reveal>
-          <details><summary>Do I need an account?</summary><p>No. Open Slate Forge in a browser to start writing. Workspaces save locally to that browser profile.</p></details>
-          <details><summary>Can I move my work to another device?</summary><p>Yes. Export a workspace backup on the original device and import it on the new one. You can also export individual documents in a supported file format.</p></details>
-          <details><summary>What should I check when opening a Word file?</summary><p>Check page breaks, wrapping, fonts, and other complex layout after import. Review the exported file in its destination app before sharing it.</p></details>
-        </div>
-      </div>
-    </section>
   </main>
 
-  <footer>
-    <div class="shell footer">
-      <span class="footer-name">Slate Forge</span>
-      <nav aria-label="Resources">
-        <a href="https://slate-web.iiankehn.com/help.html">User guide</a>
-        <a href="https://github.com/iiankehn/slate-forge-web">Web app source</a>
-        <a href="https://github.com/iiankehn/slate-android/releases">Android archive</a>
-      </nav>
-      <p class="fine">Slate for Android is deprecated. Its releases remain available for existing users.</p>
-    </div>
-  </footer>
 <script>
 /* Enhance the feature panels as keyboard-operable tabs. */
 const showcase = document.querySelector("[data-showcase]");
