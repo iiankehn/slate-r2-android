@@ -1,8 +1,6 @@
-# Slate Forge historical repository
+# Standalone Slate Forge for Android (deprecated)
 
-Slate Notes and Slate Forge have been unified into **Slate**, one adaptive Android writing application maintained at [`iiankehn/slate-android`](https://github.com/iiankehn/slate-android).
-
-This repository preserves the former standalone Forge code and its history. Active development, issues, documentation, CI, downloads, and monthly releases now belong to the unified repository.
+This repository preserves the original standalone Slate Forge Android source and hosts the [Slate Forge product website](https://slate.iiankehn.com/). Both standalone Forge and the [unified Android app](https://github.com/iiankehn/slate-android) are deprecated. Active development has moved to [Slate Forge on the web](https://slate-web.iiankehn.com/). The migration information below is historical.
 
 ## What changed
 
