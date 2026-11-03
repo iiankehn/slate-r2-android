@@ -136,6 +136,15 @@
       mask-image: linear-gradient(black, transparent);
     }
     .capture-reflection img { transform: scaleY(-1); filter: blur(1px); }
+    @media (min-width: 960px) {
+      .benefit-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: min(100%, 80rem);
+        margin-inline: auto;
+      }
+      .benefit-grid > section { padding-inline: clamp(1rem, 3vw, 3rem); }
+    }
   </style>
 </head>
 <body>
@@ -169,44 +178,46 @@
       </figure>
       <p>Not only can you write documents, but you can create and edit PDFs without leaving the app.</p>
     </section>
-    <section class="design-pdf" aria-labelledby="portability-title">
-      <figure>
-        <svg width="80" height="80" viewBox="0 0 48 48" fill="none" stroke="var(--focus)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-          <circle cx="24" cy="24" r="17"/>
-          <circle cx="24" cy="19" r="5"/>
-          <path d="M13 36v-1a11 8 0 0 1 22 0v1"/>
-        </svg>
-        <figcaption><h2 id="portability-title">No account required</h2></figcaption>
-      </figure>
-      <p>No data collection. Local only workspace that you can take with you no matter where you go.</p>
-    </section>
-    <section class="design-pdf" aria-labelledby="updates-title">
-      <figure>
-        <svg width="80" height="80" viewBox="0 0 48 48" fill="none" stroke="var(--focus)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-          <path d="M39 21A15 15 0 0 0 13 13L8 18m0-9v9h9M9 27a15 15 0 0 0 26 8l5-5m0 9v-9h-9"/>
-        </svg>
-        <figcaption><h2 id="updates-title">No update required</h2></figcaption>
-      </figure>
-      <p>No more worrying about updates. Slate Forge is always up-to-date.</p>
-    </section>
-    <section class="design-pdf" aria-labelledby="offline-title">
-      <figure>
-        <svg width="80" height="80" viewBox="0 0 48 48" fill="none" stroke="var(--focus)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-          <circle cx="24" cy="24" r="17"/><ellipse cx="24" cy="24" rx="8" ry="17"/><path d="M7 24h34"/>
-        </svg>
-        <figcaption><h2 id="offline-title">Work offline</h2></figcaption>
-      </figure>
-      <p>Don’t have an Internet connection? No worries. Slate Forge works offline. No connection required.</p>
-    </section>
-    <section class="design-pdf" aria-labelledby="subscription-title">
-      <figure>
-        <svg width="80" height="80" viewBox="0 0 48 48" fill="none" stroke="var(--focus)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-          <path d="M9 15V12a3 3 0 0 1 3-3h24a3 3 0 0 1 3 3v18M9 22v14a3 3 0 0 0 3 3h19M9 17h30M15 29h6M6 6l36 36"/>
-        </svg>
-        <figcaption><h2 id="subscription-title">No subscription. Period.</h2></figcaption>
-      </figure>
-      <p>You shouldn’t have to have a subscription to use a productivity app. Rule your work. As long as Slate Forge exists.</p>
-    </section>
+    <div class="benefit-grid">
+      <section class="design-pdf" aria-labelledby="portability-title">
+        <figure>
+          <svg width="80" height="80" viewBox="0 0 48 48" fill="none" stroke="var(--focus)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <circle cx="24" cy="24" r="17"/>
+            <circle cx="24" cy="19" r="5"/>
+            <path d="M13 36v-1a11 8 0 0 1 22 0v1"/>
+          </svg>
+          <figcaption><h2 id="portability-title">No account required</h2></figcaption>
+        </figure>
+        <p>No data collection. Local only workspace that you can take with you no matter where you go.</p>
+      </section>
+      <section class="design-pdf" aria-labelledby="updates-title">
+        <figure>
+          <svg width="80" height="80" viewBox="0 0 48 48" fill="none" stroke="var(--focus)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M39 21A15 15 0 0 0 13 13L8 18m0-9v9h9M9 27a15 15 0 0 0 26 8l5-5m0 9v-9h-9"/>
+          </svg>
+          <figcaption><h2 id="updates-title">No update required</h2></figcaption>
+        </figure>
+        <p>No more worrying about updates. Slate Forge is always up-to-date.</p>
+      </section>
+      <section class="design-pdf" aria-labelledby="offline-title">
+        <figure>
+          <svg width="80" height="80" viewBox="0 0 48 48" fill="none" stroke="var(--focus)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <circle cx="24" cy="24" r="17"/><ellipse cx="24" cy="24" rx="8" ry="17"/><path d="M7 24h34"/>
+          </svg>
+          <figcaption><h2 id="offline-title">Work offline</h2></figcaption>
+        </figure>
+        <p>Don’t have an Internet connection? No worries. Slate Forge works offline. No connection required.</p>
+      </section>
+      <section class="design-pdf" aria-labelledby="subscription-title">
+        <figure>
+          <svg width="80" height="80" viewBox="0 0 48 48" fill="none" stroke="var(--focus)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <path d="M9 15V12a3 3 0 0 1 3-3h24a3 3 0 0 1 3 3v18M9 22v14a3 3 0 0 0 3 3h19M9 17h30M15 29h6M6 6l36 36"/>
+          </svg>
+          <figcaption><h2 id="subscription-title">No subscription. Period.</h2></figcaption>
+        </figure>
+        <p>You shouldn’t have to have a subscription to use a productivity app. Rule your work. As long as Slate Forge exists.</p>
+      </section>
+    </div>
   </main>
 </body>
 </html>
