@@ -118,14 +118,11 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: clamp(.6rem, 1.7vw, 1.4rem);
       padding: clamp(.6rem, 2vw, 1.5rem);
-      background: var(--stage);
-      border: 1px solid var(--line);
-      border-radius: clamp(14px, 2vw, 26px);
     }
     .design-pdf-captures img { display: block; width: 100%; height: auto; border-radius: clamp(7px, 1vw, 14px); }
     .design-pdf h2 { margin: clamp(1.4rem, 3vw, 2.5rem) 0 0; font-size: clamp(2.2rem, 5vw, 4.5rem); line-height: 1.02; letter-spacing: -.06em; }
     .design-pdf p { max-width: 52ch; margin: .8rem auto 0; }
-    .design-pdf-captures { perspective: 1100px; gap: clamp(.5rem, 2.8vw, 2.5rem); padding: clamp(.7rem, 3vw, 2.75rem); }
+    .design-pdf-captures { perspective: 1100px; gap: clamp(.5rem, 2.8vw, 2.5rem); padding: 0; }
     .capture-angle { min-width: 0; transform: rotateY(12deg); }
     .capture-angle + .capture-angle { transform: rotateY(-12deg); }
     .capture-angle > img { box-shadow: 0 8px 22px rgb(0 0 0 / 18%); }
