@@ -202,6 +202,57 @@ figcaption { margin-top: .9rem; color: var(--muted); font-size: .84rem; }
                 box-shadow 360ms cubic-bezier(.22,.61,.36,1);
   }
 }
+
+/* Give the real product captures room to carry the story. */
+:root { --stage: #e8edf8; --stage-edge: #cbd5e9; }
+@media (prefers-color-scheme: dark) {
+  :root { --stage: #1b2336; --stage-edge: #343f59; }
+}
+.hero { padding-top: clamp(2.75rem, 5vw, 5rem); }
+.hero-shot { max-width: none; }
+.device-stage {
+  position: relative;
+  padding: clamp(1.2rem, 5.5vw, 5rem) clamp(2rem, 12vw, 9rem) clamp(1.2rem, 4vw, 3.5rem) clamp(1.2rem, 5.5vw, 5rem);
+  border-radius: clamp(20px, 4vw, 42px);
+  border: 1px solid var(--stage-edge);
+  background: var(--stage);
+  isolation: isolate;
+}
+.device-stage > img:first-child { border-radius: clamp(8px, 1.5vw, 20px); }
+.hero-shot .phone-shot {
+  position: absolute;
+  width: 19%;
+  right: 4%;
+  bottom: 5%;
+  border: clamp(3px, .5vw, 7px) solid #22242a;
+  border-radius: clamp(10px, 2vw, 26px);
+  box-shadow: 0 14px 36px rgb(0 0 0 / 25%);
+}
+.hero-shot figcaption { display: flex; justify-content: space-between; gap: .8rem; text-align: left; }
+.hero-shot figcaption span:first-child { font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.workspace .chapter-head { max-width: 58rem; }
+.scene {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  padding: clamp(1.15rem, 4vw, 3.25rem);
+  background: var(--stage);
+  border: 1px solid var(--stage-edge);
+  gap: clamp(1.2rem, 3vw, 2.6rem);
+}
+.scene-copy { grid-column: span 12; display: grid; grid-template-columns: 1fr 1fr; align-items: end; gap: 1.2rem; }
+.scene-copy p { margin: 0; max-width: 44ch; }
+.scene img { grid-column: 1 / -1; margin-top: 0; }
+.appearance { background: var(--stage); }
+@media (max-width: 620px) {
+  .scene-copy { grid-template-columns: 1fr; gap: .7rem; }
+  .device-stage { padding-left: .75rem; padding-top: .9rem; }
+  .hero-shot .phone-shot { width: 23%; right: 3%; }
+  .hero-shot figcaption { font-size: .72rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero-shot .phone-shot { transform: translateY(var(--phone-lift, 0px)); }
+  .scene[data-enter] img { animation: screenshot-in 420ms cubic-bezier(.2,.7,.25,1) both; }
+  @keyframes screenshot-in { from { transform: translateY(10px) scale(.985); opacity: .6; } }
+}
 </style>
   <title>Slate Forge · Make room for words</title>
 </head>
@@ -219,20 +270,23 @@ figcaption { margin-top: .9rem; color: var(--muted); font-size: .84rem; }
       <div class="hero-copy">
         <p class="label">Slate Forge for the web</p>
         <h1 id="hero-title">Make room<br> for words.</h1>
-        <p class="intro">A full word processor in your browser. Write, lay out, and finish your documents in one workspace.</p>
+        <p class="intro">Write the draft, shape the page, and finish the document in your browser.</p>
         <a class="cta" href="https://slate-web.iiankehn.com/">Open Slate Forge <span aria-hidden="true">↗</span></a>
         <p class="fine">Public beta · No account required</p>
       </div>
       <figure class="hero-shot" data-motion>
+        <div class="device-stage">
         <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/slate-forge-workspace-preview.jpg" width="1363" height="936" fetchpriority="high" alt="Slate Forge editor with a formatting ribbon, document outline, and page layout controls around a sample document.">
-        <figcaption>The Slate Forge editing workspace.</figcaption>
+          <img class="phone-shot" src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/ui/workspace-mobile.png" width="390" height="844" alt="Slate Forge’s workspace and document templates on a phone.">
+        </div>
+        <figcaption><span>01 / The workspace</span><span>Desktop editor and mobile workspace</span></figcaption>
       </figure>
     </section>
 
     <section class="chapter workspace" id="workspace" aria-labelledby="workspace-title">
       <div class="shell">
         <div class="chapter-head" data-reveal>
-          <p class="label">Explore the workspace</p>
+          <p class="label">02 / Explore the workspace</p>
           <h2 id="workspace-title">From first line<br>to final page.</h2>
         </div>
         <!-- Without JavaScript, all three chapters remain readable in order. -->
@@ -262,7 +316,7 @@ figcaption { margin-top: .9rem; color: var(--muted); font-size: .84rem; }
     <section class="chapter workflow" id="workflow" aria-labelledby="workflow-title">
       <div class="shell">
         <div class="chapter-head" data-reveal>
-          <p class="label">A document, start to finish</p>
+          <p class="label">03 / A document, start to finish</p>
           <h2 id="workflow-title">Pick up where<br>you left off.</h2>
         </div>
         <div class="editorial-grid">
@@ -282,7 +336,7 @@ figcaption { margin-top: .9rem; color: var(--muted); font-size: .84rem; }
     <section class="chapter appearance" aria-labelledby="appearance-title">
       <div class="shell editorial-grid">
         <div class="appearance-copy" data-reveal>
-          <p class="label">Make it yours</p>
+          <p class="label">04 / Make it yours</p>
           <h2 id="appearance-title">Set the mood<br>for writing.</h2>
           <p>Pick an editor theme or follow your system appearance. Change the accent, switch on the dark page view, or fit the sheet to your window.</p>
           <p class="fine">Dark page view is a screen preference. Your document’s original colors carry through to printing and exports.</p>
@@ -357,6 +411,7 @@ function animateShot() {
   if (Math.abs(target - progress) < .002) progress = target;
   shot.style.setProperty("--lift", `${(1 - progress) * 14}px`);
   shot.style.setProperty("--scale", 0.972 + progress * 0.028);
+  shot.style.setProperty("--phone-lift", `${(1 - progress) * 12}px`);
   if (progress !== target) scheduleShot();
 }
 
