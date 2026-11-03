@@ -69,8 +69,7 @@ a { color: inherit; text-underline-offset: .22em; }
 .nav a { display: inline-flex; align-items: center; min-height: 44px; }
 
 
-.brand { min-width: 44px; justify-content: center; }
-.brand img { width: 36px; }
+.brand img { width: 244px; }
 
 .hero { padding-top: clamp(3.4rem, 7vw, 7.8rem); text-align: center; }
 .hero-copy { display: grid; justify-items: center; }
@@ -160,6 +159,47 @@ figcaption { margin-top: .9rem; color: var(--muted); font-size: .84rem; }
   @keyframes chapter-in { from { opacity: .55; transform: translateY(22px); } }
 }
 
+/* The glass treatment belongs to the wordmark, leaving the rest of the header clear. */
+.bar { pointer-events: none; }
+.nav .brand {
+  pointer-events: auto;
+  padding: 4px 11px;
+  border-radius: 16px;
+  background: rgb(248 249 252 / 76%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 58%), inset 0 0 0 1px rgb(95 99 116 / 12%);
+}
+.nav .brand img { width: 36px; }
+.nav .brand[data-glass-dark] {
+  background: rgb(22 23 30 / 76%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 28%), inset 0 0 0 1px rgb(255 255 255 / 12%);
+}
+@media (prefers-color-scheme: dark) {
+  .nav .brand:not([data-glass-ready]) { background: rgb(22 23 30 / 76%); }
+}
+@supports ((backdrop-filter: blur(9px)) or (-webkit-backdrop-filter: blur(9px))) {
+  .nav .brand {
+    background: rgb(248 249 252 / 22%);
+    background-image: linear-gradient(170deg, rgb(255 255 255 / 23%), transparent 52%);
+    -webkit-backdrop-filter: blur(9px) saturate(135%);
+    backdrop-filter: blur(9px) saturate(135%);
+  }
+  .nav .brand[data-glass-dark] {
+    background-color: rgb(13 14 19 / 27%);
+  }
+  @media (prefers-color-scheme: dark) {
+    .nav .brand:not([data-glass-ready]) { background-color: rgb(13 14 19 / 27%); }
+  }
+}
+@media (forced-colors: active) {
+  .nav .brand, .nav .brand[data-glass-dark] { background: Canvas; border: 1px solid CanvasText; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nav .brand[data-glass-ready] {
+    transition: background-color 360ms cubic-bezier(.22,.61,.36,1),
+                box-shadow 360ms cubic-bezier(.22,.61,.36,1);
+  }
+}
 </style>
   <title>Slate Forge · Make room for words</title>
 </head>
@@ -339,6 +379,44 @@ if ("IntersectionObserver" in window) {
   document.querySelectorAll("[data-reveal]").forEach(section => observer.observe(section));
 }
 
+/* Resolve the backdrop from page surfaces and the known dark screenshot captures. */
+const glassBrand = document.querySelector(".nav .brand");
+const systemDark = matchMedia("(prefers-color-scheme: dark)");
+let glassFrame = 0;
+
+function updateGlass() {
+  glassFrame = 0;
+  const rect = glassBrand.getBoundingClientRect();
+  const stack = document.elementsFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  let dark = systemDark.matches;
+  for (const element of stack) {
+    if (element.closest("header")) continue;
+    if (element instanceof HTMLImageElement) {
+      const image = element.currentSrc || element.src;
+      dark = /\/(personal-appearance-preview|slate-forge-pdf-qa)\.jpg$/.test(image);
+      break;
+    }
+    const color = getComputedStyle(element).backgroundColor;
+    const channels = color.match(/[\d.]+/g)?.map(Number);
+    if (!channels || channels.length < 3 || channels[3] === 0) continue;
+    dark = channels[0] * .2126 + channels[1] * .7152 + channels[2] * .0722 < 128;
+    break;
+  }
+  glassBrand.toggleAttribute("data-glass-dark", dark);
+  glassBrand.setAttribute("data-glass-ready", "");
+}
+
+function scheduleGlass() {
+  if (!glassFrame) glassFrame = requestAnimationFrame(updateGlass);
+}
+
+addEventListener("scroll", scheduleGlass, { passive: true });
+addEventListener("resize", scheduleGlass);
+addEventListener("load", scheduleGlass);
+showcase.addEventListener("click", scheduleGlass);
+showcase.addEventListener("keydown", scheduleGlass);
+systemDark.addEventListener("change", scheduleGlass);
+updateGlass();
 </script>
 </body>
 </html>
