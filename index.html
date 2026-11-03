@@ -125,7 +125,20 @@
     .design-pdf-captures img { display: block; width: 100%; height: auto; border-radius: clamp(7px, 1vw, 14px); }
     .design-pdf h2 { margin: clamp(1.4rem, 3vw, 2.5rem) 0 0; font-size: clamp(2.2rem, 5vw, 4.5rem); line-height: 1.02; letter-spacing: -.06em; }
     .design-pdf p { max-width: 52ch; margin: .8rem auto 0; }
-    @media (max-width: 640px) { .design-pdf-captures { grid-template-columns: 1fr; } }
+    .design-pdf-captures { perspective: 1100px; gap: clamp(.5rem, 2.8vw, 2.5rem); padding: clamp(.7rem, 3vw, 2.75rem); }
+    .capture-angle { min-width: 0; transform: rotateY(12deg); }
+    .capture-angle + .capture-angle { transform: rotateY(-12deg); }
+    .capture-angle > img { box-shadow: 0 8px 22px rgb(0 0 0 / 18%); }
+    .capture-reflection {
+      height: auto;
+      aspect-ratio: 5 / 1;
+      overflow: hidden;
+      margin-top: 4px;
+      opacity: .34;
+      -webkit-mask-image: linear-gradient(black, transparent);
+      mask-image: linear-gradient(black, transparent);
+    }
+    .capture-reflection img { transform: scaleY(-1); filter: blur(1px); }
   </style>
 </head>
 <body>
@@ -146,8 +159,14 @@
     <section class="design-pdf" aria-labelledby="design-pdf-title">
       <figure>
         <div class="design-pdf-captures">
-          <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/slate-forge-design-canvas-preview.jpg" width="1363" height="936" loading="lazy" alt="Slate Forge Design canvas with an editable text box and design controls.">
-          <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/slate-forge-pdf-qa.jpg" width="1363" height="936" loading="lazy" alt="A PDF open in Slate Forge with annotation controls beside the page.">
+          <div class="capture-angle">
+            <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/slate-forge-design-canvas-preview.jpg" width="1363" height="936" loading="lazy" alt="Slate Forge Design canvas with an editable text box and design controls.">
+            <div class="capture-reflection" aria-hidden="true"><img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/slate-forge-design-canvas-preview.jpg" width="1363" height="936" loading="lazy" alt=""></div>
+          </div>
+          <div class="capture-angle">
+            <img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/slate-forge-pdf-qa.jpg" width="1363" height="936" loading="lazy" alt="A PDF open in Slate Forge with annotation controls beside the page.">
+            <div class="capture-reflection" aria-hidden="true"><img src="https://raw.githubusercontent.com/iiankehn/slate-forge-web/0fe41113e12f33f6a6ac03f5f07fca08e4d64c04/docs/slate-forge-pdf-qa.jpg" width="1363" height="936" loading="lazy" alt=""></div>
+          </div>
         </div>
         <figcaption><h2 id="design-pdf-title">Design and PDF.</h2></figcaption>
       </figure>
