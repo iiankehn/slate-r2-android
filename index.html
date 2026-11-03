@@ -87,9 +87,6 @@
       bottom: clamp(.8rem, 2.2vw, 2rem);
       width: clamp(82px, 11vw, 140px);
       margin: 0;
-      padding: .25rem .45rem;
-      border-radius: .35rem;
-      background: var(--canvas);
     }
     .workspace {
       position: relative;
@@ -145,6 +142,20 @@
       }
       .benefit-grid > section { padding-inline: clamp(1rem, 3vw, 3rem); }
     }
+      .site-footer {
+      border-top: 1px solid var(--line);
+      padding: 1.5rem max(1rem, 4vw);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem 2rem;
+      color: var(--muted);
+    }
+    .site-footer p { margin: 0; font-size: 1rem; }
+    .site-footer nav { display: flex; flex-wrap: wrap; gap: 0 1.5rem; }
+    .site-footer a { display: inline-flex; align-items: center; min-height: 44px; color: var(--ink); text-underline-offset: .2em; }
+    .site-footer a:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
   </style>
 </head>
 <body>
@@ -224,5 +235,12 @@
       <a class="cta" style="margin-top: 1.65rem" href="https://slate-web.iiankehn.com/">Get started</a>
     </section>
   </main>
+  <footer class="site-footer">
+    <p>Slate Forge is a CORE Project.</p>
+    <nav aria-label="Project resources">
+      <a href="https://slate-web.iiankehn.com/THIRD-PARTY-NOTICES.txt">Open-source licenses</a>
+      <a href="https://github.com/iiankehn/slate-forge-web">Source repository</a>
+    </nav>
+  </footer>
 </body>
 </html>
