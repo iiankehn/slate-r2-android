@@ -47,7 +47,7 @@
   }
 }
 *, *::before, *::after { box-sizing: border-box; }
-html { scroll-padding-top: 5.25rem; }
+html { scroll-padding-top: 6.25rem; }
 body { margin: 0; background: var(--canvas); color: var(--ink); line-height: 1.5; }
 [hidden] { display: none !important; }
 img { display: block; max-width: 100%; height: auto; }
@@ -65,7 +65,7 @@ a { color: inherit; text-underline-offset: .22em; }
   background: transparent;
 }
 .nav { display: flex; align-items: center; gap: clamp(.85rem, 3vw, 2.4rem); }
-.nav { min-height: 4rem; justify-content: space-between; }
+.nav { min-height: 5rem; justify-content: space-between; }
 .nav a { display: inline-flex; align-items: center; min-height: 44px; }
 
 
@@ -163,12 +163,12 @@ figcaption { margin-top: .9rem; color: var(--muted); font-size: .84rem; }
 .bar { pointer-events: none; }
 .nav .brand {
   pointer-events: auto;
-  padding: 4px 11px;
+  padding: 10px 17px;
   border-radius: 16px;
   background: rgb(248 249 252 / 76%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 58%), inset 0 0 0 1px rgb(95 99 116 / 12%);
 }
-.nav .brand img { width: 36px; }
+.nav .brand img { width: 48px; }
 .nav .brand[data-glass-dark] {
   background: rgb(22 23 30 / 76%);
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 28%), inset 0 0 0 1px rgb(255 255 255 / 12%);
@@ -208,7 +208,7 @@ figcaption { margin-top: .9rem; color: var(--muted); font-size: .84rem; }
   <header class="bar">
     <div class="shell nav">
       <a class="brand" href="./" aria-label="Slate Forge home">
-        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlNsYXRlIEZvcmdlIj48ZGVmcz4KPGxpbmVhckdyYWRpZW50IGlkPSJzZi10b3AiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4MT0iMzE1IiB5MT0iNjEwIiB4Mj0iNzAwIiB5Mj0iMjAwIj48c3RvcCBzdG9wLWNvbG9yPSIjMUQ1M0U1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNUI4RkZGIi8+PC9saW5lYXJHcmFkaWVudD4KPGxpbmVhckdyYWRpZW50IGlkPSJzZi1ib2R5IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjY1NSIgeTE9IjU2NSIgeDI9IjkwMCIgeTI9IjkwMCI+PHN0b3Agc3RvcC1jb2xvcj0iIzhBNjNGRiIvPjxzdG9wIG9mZnNldD0iLjc1IiBzdG9wLWNvbG9yPSIjRkY3QTQ1Ii8+PC9saW5lYXJHcmFkaWVudD4KPGxpbmVhckdyYWRpZW50IGlkPSJzZi1mb2xkIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjQzMCIgeTE9IjUyMCIgeDI9IjcyMCIgeTI9Ijc4MCI+PHN0b3Agc3RvcC1jb2xvcj0iIzFENTNFNSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzhBNjNGRiIvPjwvbGluZWFyR3JhZGllbnQ+CjxsaW5lYXJHcmFkaWVudCBpZD0ic2YtZGVwdGgiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4MT0iNDYwIiB5MT0iNTMwIiB4Mj0iNjkwIiB5Mj0iNzYwIj48c3RvcCBzdG9wLWNvbG9yPSIjMEQxMTE3IiBzdG9wLW9wYWNpdHk9Ii4yNiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBEMTExNyIgc3RvcC1vcGFjaXR5PSIwIi8+PC9saW5lYXJHcmFkaWVudD4KPG1hc2sgaWQ9InNmLWN1dCIgbWFza1VuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeD0iMjIwIiB5PSIxNDAiIHdpZHRoPSI4MDAiIGhlaWdodD0iOTIwIj48cmVjdCB4PSIyMjAiIHk9IjE0MCIgd2lkdGg9IjgwMCIgaGVpZ2h0PSI5MjAiIGZpbGw9IndoaXRlIi8+PGNpcmNsZSBjeD0iODYxIiBjeT0iODM3IiByPSIzOCIgZmlsbD0iYmxhY2siLz48L21hc2s+CjwvZGVmcz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxLjYgLjY0KSBzY2FsZSguMDE2KSI+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTIyMCAtMTQwKSI+PGcgbWFzaz0idXJsKCNzZi1jdXQpIj48cGF0aCBmaWxsPSIjRkY3QTQ1IiBkPSJNNTI4IDUwMiBDNjE3IDUyOSA3MjYgNTUyIDc5MyA2MDAgQzgzOSA2MzEgODYzIDY2NSA4ODUgNzA3IEM5MDggNzU1IDk0MiA3ODYgOTg0IDgxMSBDOTYxIDg2NyA5NDkgOTM2IDk0NyAxMDI5IEw3MzggODg4IEM3NDYgODQ5IDc0OCA4MTAgNzI0IDc4NCBDNjc0IDczNSA0NzggNzA5IDQwNyA2NjEgQzM0MyA2MDAgNDQ1IDUzOSA1MjggNDk0IFoiLz48cGF0aCBmaWxsPSIjOEE2M0ZGIiBkPSJNNTI4IDUwMiBDNjEwIDUyMiA2ODQgNTY4IDcyMyA2NTcgQzc0NyA3MTQgNzUzIDgwMiA3MzggODg4IEM3NDYgODQ2IDc0NCA4MTMgNzIwIDc4OSBDNjcxIDc0MiA0ODAgNzEwIDQwNyA2NjEgQzM0MyA2MDAgNDQ1IDUzOSA1MjggNDk0IFoiLz48cGF0aCBmaWxsPSIjMUQ1M0U1IiBkPSJNNjcwIDE4MyBDNzExIDI2NyA3MzkgMzYxIDY3MyA0MTYgQzYzNSA0NTEgNTgwIDQ3NSA1MjggNTAyIEM0NTEgNTQ3IDM1MCA1OTkgNDA3IDY2MSBDMzI1IDYzMyAyNzAgNTY4IDI2OSA0ODkgQzI2NSA0MTIgMzEwIDM2NSAzNzUgMzI4IFoiLz48L2c+PC9nPjwvZz48L3N2Zz4=" width="36" height="36" alt="">
+        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiByb2xlPSJpbWciIGFyaWEtbGFiZWw9IlNsYXRlIEZvcmdlIj48ZGVmcz4KPGxpbmVhckdyYWRpZW50IGlkPSJzZi10b3AiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4MT0iMzE1IiB5MT0iNjEwIiB4Mj0iNzAwIiB5Mj0iMjAwIj48c3RvcCBzdG9wLWNvbG9yPSIjMUQ1M0U1Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNUI4RkZGIi8+PC9saW5lYXJHcmFkaWVudD4KPGxpbmVhckdyYWRpZW50IGlkPSJzZi1ib2R5IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjY1NSIgeTE9IjU2NSIgeDI9IjkwMCIgeTI9IjkwMCI+PHN0b3Agc3RvcC1jb2xvcj0iIzhBNjNGRiIvPjxzdG9wIG9mZnNldD0iLjc1IiBzdG9wLWNvbG9yPSIjRkY3QTQ1Ii8+PC9saW5lYXJHcmFkaWVudD4KPGxpbmVhckdyYWRpZW50IGlkPSJzZi1mb2xkIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeDE9IjQzMCIgeTE9IjUyMCIgeDI9IjcyMCIgeTI9Ijc4MCI+PHN0b3Agc3RvcC1jb2xvcj0iIzFENTNFNSIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzhBNjNGRiIvPjwvbGluZWFyR3JhZGllbnQ+CjxsaW5lYXJHcmFkaWVudCBpZD0ic2YtZGVwdGgiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4MT0iNDYwIiB5MT0iNTMwIiB4Mj0iNjkwIiB5Mj0iNzYwIj48c3RvcCBzdG9wLWNvbG9yPSIjMEQxMTE3IiBzdG9wLW9wYWNpdHk9Ii4yNiIvPjxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iIzBEMTExNyIgc3RvcC1vcGFjaXR5PSIwIi8+PC9saW5lYXJHcmFkaWVudD4KPG1hc2sgaWQ9InNmLWN1dCIgbWFza1VuaXRzPSJ1c2VyU3BhY2VPblVzZSIgeD0iMjIwIiB5PSIxNDAiIHdpZHRoPSI4MDAiIGhlaWdodD0iOTIwIj48cmVjdCB4PSIyMjAiIHk9IjE0MCIgd2lkdGg9IjgwMCIgaGVpZ2h0PSI5MjAiIGZpbGw9IndoaXRlIi8+PGNpcmNsZSBjeD0iODYxIiBjeT0iODM3IiByPSIzOCIgZmlsbD0iYmxhY2siLz48L21hc2s+CjwvZGVmcz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgxLjYgLjY0KSBzY2FsZSguMDE2KSI+PGcgdHJhbnNmb3JtPSJ0cmFuc2xhdGUoLTIyMCAtMTQwKSI+PGcgbWFzaz0idXJsKCNzZi1jdXQpIj48cGF0aCBmaWxsPSIjRkY3QTQ1IiBkPSJNNTI4IDUwMiBDNjE3IDUyOSA3MjYgNTUyIDc5MyA2MDAgQzgzOSA2MzEgODYzIDY2NSA4ODUgNzA3IEM5MDggNzU1IDk0MiA3ODYgOTg0IDgxMSBDOTYxIDg2NyA5NDkgOTM2IDk0NyAxMDI5IEw3MzggODg4IEM3NDYgODQ5IDc0OCA4MTAgNzI0IDc4NCBDNjc0IDczNSA0NzggNzA5IDQwNyA2NjEgQzM0MyA2MDAgNDQ1IDUzOSA1MjggNDk0IFoiLz48cGF0aCBmaWxsPSIjOEE2M0ZGIiBkPSJNNTI4IDUwMiBDNjEwIDUyMiA2ODQgNTY4IDcyMyA2NTcgQzc0NyA3MTQgNzUzIDgwMiA3MzggODg4IEM3NDYgODQ2IDc0NCA4MTMgNzIwIDc4OSBDNjcxIDc0MiA0ODAgNzEwIDQwNyA2NjEgQzM0MyA2MDAgNDQ1IDUzOSA1MjggNDk0IFoiLz48cGF0aCBmaWxsPSIjMUQ1M0U1IiBkPSJNNjcwIDE4MyBDNzExIDI2NyA3MzkgMzYxIDY3MyA0MTYgQzYzNSA0NTEgNTgwIDQ3NSA1MjggNTAyIEM0NTEgNTQ3IDM1MCA1OTkgNDA3IDY2MSBDMzI1IDYzMyAyNzAgNTY4IDI2OSA0ODkgQzI2NSA0MTIgMzEwIDM2NSAzNzUgMzI4IFoiLz48L2c+PC9nPjwvZz48L3N2Zz4=" width="48" height="48" alt="">
       </a>
     </div>
   </header>
